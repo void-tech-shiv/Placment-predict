@@ -1,30 +1,76 @@
 {% extends "base.html" %}
-{% block title %}Model Leaderboard - PlacementAI{% endblock %}
-{% block page_header %}<i class="fa-solid fa-brain text-primary me-2"></i> Model Training & Leaderboard{% endblock %}
+{% block title %}Model Training - Placement Predict{% endblock %}
+{% block page_header %}<i class="fa-solid fa-microchip text-primary me-2"></i> Model Training{% endblock %}
 {% block content %}
+<div class="pp-page-intro">
+  <div>
+    <h2>Train and compare placement models</h2>
+    <p>Run the training pipeline on the active dataset, compare cross-validation accuracy, and identify the best-performing algorithm.</p>
+  </div>
+  {% if best_model %}<span class="pp-chip"><i class="fa-solid fa-trophy"></i> Best: {{ best_model }}</span>{% else %}<span class="pp-chip"><i class="fa-solid fa-flask"></i> Model lab</span>{% endif %}
+</div>
+
 <div class="row g-4">
   <div class="col-xl-4">
-    <div class="card-custom h-100">
-      <div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-play text-success"></i> Train Models</h5></div>
-      <p class="text-muted small">Training uses the current active dataset with cross-validation and a final test split.</p>
+    <section class="pp-panel h-100">
+      <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Training control</div>
+      <h5 class="fw-bold mb-2">Run Training Pipeline</h5>
+      <p class="text-muted small mb-4">The trainer uses the current active dataset, cross-validation for model selection, and an untouched test split for final evaluation.</p>
+
       {% if session.get('user', {}).get('role') == 'Admin' %}
-      <button id="trainBtn" class="btn-primary-custom w-100 justify-content-center"><i class="fa-solid fa-bolt"></i> Start Training</button>
-      {% else %}<div class="alert alert-info small mb-0">Administrator access is required to retrain shared models.</div>{% endif %}
-      <div id="status" class="small text-muted mt-3">Ready.</div>
-      <div class="progress mt-2" style="height:10px"><div id="progressBar" class="progress-bar progress-bar-striped" style="width:0%"></div></div>
-    </div>
+      <button id="trainBtn" class="btn-primary-custom w-100 justify-content-center py-2.5">
+        <i class="fa-solid fa-play"></i> Start Model Training
+      </button>
+      {% else %}
+      <div class="alert alert-info small mb-0"><i class="fa-solid fa-lock me-1"></i> Administrator access is required to retrain shared models.</div>
+      {% endif %}
+
+      <div class="pp-metric-tile mt-4">
+        <span>Pipeline status</span>
+        <strong id="status">Ready.</strong>
+        <div class="progress mt-3" style="height:9px"><div id="progressBar" class="progress-bar progress-bar-striped" style="width:0%"></div></div>
+      </div>
+
+      <div class="row g-2 mt-2">
+        <div class="col-6"><div class="pp-metric-tile"><span>Models</span><strong>{{ accuracy|length }}</strong></div></div>
+        <div class="col-6"><div class="pp-metric-tile"><span>Best score</span><strong>{{ (best_accuracy|string + '%') if best_accuracy is not none else '—' }}</strong></div></div>
+      </div>
+    </section>
   </div>
+
   <div class="col-xl-8">
-    <div class="card-custom h-100">
-      <div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-trophy text-warning"></i> Model Accuracy</h5>{% if best_model %}<span class="badge-custom badge-success">Best: {{ best_model }} - {{ best_accuracy }}%</span>{% endif %}</div>
-      {% if accuracy %}<div style="height:320px"><canvas id="accuracyChart"></canvas></div>{% else %}<div class="text-center py-5 text-muted">No trained leaderboard yet.</div>{% endif %}
-    </div>
+    <section class="pp-panel h-100">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+          <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Performance overview</div>
+          <h5 class="fw-bold mb-0">Model Accuracy Comparison</h5>
+        </div>
+        {% if best_model %}<span class="badge-custom badge-success"><i class="fa-solid fa-award me-1"></i>{{ best_model }} · {{ best_accuracy }}%</span>{% endif %}
+      </div>
+      {% if accuracy %}<div style="height:340px"><canvas id="accuracyChart"></canvas></div>{% else %}<div class="pp-result-placeholder"><div><i class="fa-solid fa-chart-column fs-2 mb-3"></i><div>No trained leaderboard yet.</div></div></div>{% endif %}
+    </section>
   </div>
 </div>
-<div class="card-custom mt-4">
-  <div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-table-list text-primary"></i> Accuracy Table</h5></div>
-  <div class="table-responsive"><table class="table align-middle mb-0"><thead class="table-light"><tr><th>Model</th><th>Cross-validation Accuracy</th></tr></thead><tbody>{% for model, score in accuracy.items() %}<tr><td class="fw-semibold">{{ model }}</td><td>{{ score }}%</td></tr>{% else %}<tr><td colspan="2" class="text-center text-muted py-4">No model results available.</td></tr>{% endfor %}</tbody></table></div>
-</div>
+
+<section class="pp-panel mt-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Leaderboard</div>
+      <h5 class="fw-bold mb-0">Cross-validation Results</h5>
+    </div>
+    <span class="pp-chip"><i class="fa-solid fa-table-list"></i> {{ accuracy|length }} algorithms</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>Model</th><th>Cross-validation Accuracy</th></tr></thead>
+      <tbody>
+        {% for model, score in accuracy.items() %}<tr><td class="fw-semibold">{{ model }}</td><td><span class="badge-custom badge-primary">{{ score }}%</span></td></tr>
+        {% else %}<tr><td colspan="2" class="text-center text-muted py-4">No model results available.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <script>window.accuracyData = {{ accuracy|tojson }};</script>
 {% endblock %}
 {% block extra_scripts %}<script src="{{ url_for('static', filename='js/train.js') }}"></script>{% endblock %}
