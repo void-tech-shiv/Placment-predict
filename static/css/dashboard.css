@@ -1,0 +1,117 @@
+/* Dashboard Custom Animated CSS */
+
+.dashboard-hero-banner {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem 2rem;
+    backdrop-filter: blur(10px);
+}
+
+.kpi-card.glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card.glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--info));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.kpi-card.glass-card:hover::before {
+    opacity: 1;
+}
+
+.counter-val, .counter-val-float {
+    font-weight: 800;
+    font-size: 1.85rem;
+    line-height: 1.1;
+    color: var(--text-main);
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.text-indigo {
+    color: #6366f1;
+}
+
+.btn-glow {
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    transition: all 0.25s ease;
+}
+
+.btn-glow:hover {
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+    transform: translateY(-2px);
+}
+
+/* Regression & Gradient Descent Visualizer CSS */
+.style-select-group .input-group-text {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.65rem;
+}
+
+.style-select-group select.form-select {
+    font-size: 0.825rem;
+    font-weight: 600;
+}
+
+.fade-in-row {
+    animation: fadeInRow 0.35s ease-out forwards;
+}
+
+@keyframes fadeInRow {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+        background-color: rgba(245, 158, 11, 0.15);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.font-medium {
+    font-weight: 500;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+/* Custom Styled Range Sliders */
+input[type=range].form-range::-webkit-slider-thumb {
+    background: var(--primary, #4f46e5);
+    box-shadow: 0 0 8px rgba(79, 70, 229, 0.5);
+    cursor: pointer;
+}
+
+#sliderLearningRate::-webkit-slider-thumb {
+    background: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.pulse-dot {
+    animation: pulseDot 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.8; }
+}

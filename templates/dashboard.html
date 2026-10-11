@@ -1,0 +1,683 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Placement Prediction System{% endblock %}
+
+{% block page_header %}
+<i class="fa-solid fa-chart-pie text-primary me-2"></i> Placement Analytics Dashboard
+{% endblock %}
+
+{% block content %}
+<!-- Hidden data container for JS Chart rendering -->
+<div id="dashboardData" 
+     data-placed="{{ placed_students }}" 
+     data-notplaced="{{ not_placed }}" 
+     data-accuracies='{{ accuracies | tojson }}'
+     data-streams='{{ stream_analytics | tojson }}'
+     data-cgpa='{{ cgpa_analytics | tojson }}'
+     data-numeric='{{ numeric_columns | tojson }}'
+     data-regression='{{ regression_data | tojson }}'
+     data-gd='{{ gd_sim_data | tojson }}'></div>
+
+<!-- Hero Welcome & Dataset Banner -->
+<div class="dashboard-hero-banner mb-4">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary-subtle text-primary font-semibold px-3 py-1.5 rounded-pill">
+                    <i class="fa-solid fa-graduation-cap me-1"></i> PlacementAI Dashboard
+                </span>
+                <span class="badge bg-success-subtle text-success font-semibold px-3 py-1.5 rounded-pill">
+                    <i class="fa-solid fa-circle-dot me-1 text-success pulse-dot"></i> Live Dataset: {{ dataset_name }}
+                </span>
+            </div>
+            <h3 class="fw-bold mb-1 text-main">Overview & Model Performance Analytics</h3>
+            <p class="text-muted mb-0 small">
+                Monitor student placement trends, Machine Learning model accuracy leaderboards, linear regression models, and gradient descent optimization.
+            </p>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-success px-3.5 py-2.5 d-flex align-items-center gap-2 rounded-3 fw-bold" data-bs-toggle="modal" data-bs-target="#uploadDatasetModal">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Dataset
+            </button>
+            <a href="{{ url_for('preprocessing') }}" class="btn btn-primary btn-glow px-3.5 py-2.5 d-flex align-items-center gap-2 rounded-3 fw-bold">
+                <i class="fa-solid fa-sliders"></i> Data Preprocessing
+            </a>
+            <a href="{{ url_for('prediction') }}" class="btn btn-outline-custom px-3.5 py-2.5 d-flex align-items-center gap-2 rounded-3 fw-semibold">
+                <i class="fa-solid fa-wand-magic-sparkles text-primary"></i> Predict Placement
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Upload & Switch Dataset Dashboard Card -->
+<div class="card-custom mb-4 border-start border-4 border-success">
+    <div class="card-header-custom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h5 class="card-title-custom mb-0 text-main">
+            <i class="fa-solid fa-cloud-arrow-up me-2 text-success"></i> Upload & Replace Active Dataset
+        </h5>
+        <span class="badge bg-success-subtle text-success font-semibold px-3 py-1.5 rounded-pill">
+            <i class="fa-solid fa-database me-1"></i> Active File: {{ dataset_name }}
+        </span>
+    </div>
+    <div class="p-3 p-md-4">
+        <form action="{{ url_for('upload_dataset') }}" method="POST" enctype="multipart/form-data" class="row align-items-center g-3">
+            <input type="hidden" name="redirect_to" value="dashboard">
+            <div class="col-lg-8 col-md-7">
+                <div class="input-group">
+                    <span class="input-group-text bg-body-tertiary border-end-0 text-muted">
+                        <i class="fa-solid fa-file-excel text-success"></i>
+                    </span>
+                    <input type="file" name="dataset" class="form-control-custom border-start-0" accept=".csv, .xlsx, .xls" required>
+                </div>
+                <div class="form-text text-muted small mt-1">
+                    <i class="fa-solid fa-circle-info text-primary me-1"></i> Supports <strong>CSV</strong> and <strong>Excel (.xlsx, .xls)</strong> files. Dashboard graphs, counts, and analytics refresh instantly.
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-5">
+                <button type="submit" class="btn-primary-custom w-100 justify-content-center py-2.5">
+                    <i class="fa-solid fa-upload me-1"></i> Upload & Update Dashboard
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Top KPI Summary Cards with Counter Animations -->
+<div class="row g-3 mb-4">
+    <!-- Card 1: Total Dataset Students -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="kpi-card glass-card">
+            <div class="kpi-icon primary">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="kpi-content">
+                <h6>Total Students</h6>
+                <h3 class="counter-val" data-target="{{ total_students }}">0</h3>
+                <div class="kpi-subtext">
+                    <i class="fa-solid fa-database text-primary me-1"></i> Dataset Records
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Placement Rate % -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="kpi-card glass-card">
+            <div class="kpi-icon success">
+                <i class="fa-solid fa-user-check"></i>
+            </div>
+            <div class="kpi-content">
+                <h6>Placement Rate</h6>
+                <h3><span class="counter-val-float" data-target="{{ placement_rate }}">0</span>%</h3>
+                <div class="kpi-subtext">
+                    <span class="badge-custom badge-success py-0.5 px-2">
+                        <i class="fa-solid fa-arrow-up"></i> {{ "{:,}".format(placed_students) }} Placed
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Best Model Accuracy -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="kpi-card glass-card">
+            <div class="kpi-icon warning">
+                <i class="fa-solid fa-bullseye"></i>
+            </div>
+            <div class="kpi-content">
+                <h6>Best Model Accuracy</h6>
+                <h3><span class="counter-val-float" data-target="{{ accuracy }}">0</span>%</h3>
+                <div class="kpi-subtext text-truncate" title="{{ best_model }}">
+                    <i class="fa-solid fa-award text-warning me-1"></i> {{ best_model }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Predictions Logged -->
+    <div class="col-sm-6 col-xl-3">
+        <div class="kpi-card glass-card">
+            <div class="kpi-icon info">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <div class="kpi-content">
+                <h6>Total Predictions</h6>
+                <h3 class="counter-val" data-target="{{ total_predictions }}">0</h3>
+                <div class="kpi-subtext">
+                    <span class="badge-custom badge-info py-0.5 px-2">
+                        <i class="fa-solid fa-layer-group"></i> {{ total_models }} ML Algorithms
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Animated Dashboard Navigation Sub-Tabs -->
+<div class="card-custom mb-4">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 border-bottom mb-4 gap-3">
+        <div>
+            <h5 class="card-title-custom mb-0">
+                <i class="fa-solid fa-chart-simple text-primary"></i> Interactive Placement Analytics Tabs
+            </h5>
+        </div>
+
+        <ul class="nav nav-pills nav-pills-custom gap-2" id="dashboardTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-overview-btn" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button" role="tab">
+                    <i class="fa-solid fa-chart-column me-1"></i> Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-stream-btn" data-bs-toggle="tab" data-bs-target="#tab-stream" type="button" role="tab">
+                    <i class="fa-solid fa-sitemap me-1"></i> Stream Breakdown
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-cgpa-btn" data-bs-toggle="tab" data-bs-target="#tab-cgpa" type="button" role="tab">
+                    <i class="fa-solid fa-graduation-cap me-1"></i> Academic CGPA
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-regression-btn" data-bs-toggle="tab" data-bs-target="#tab-regression" type="button" role="tab">
+                    <i class="fa-solid fa-chart-line me-1 text-info"></i> Regression Model
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-gd-btn" data-bs-toggle="tab" data-bs-target="#tab-gd" type="button" role="tab">
+                    <i class="fa-solid fa-bolt me-1 text-warning"></i> Gradient Descent
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Animated Tab Panels Content -->
+    <div class="tab-content tab-content-animated" id="dashboardTabsContent">
+
+        <!-- Tab 1: Overview (Model Accuracy & Placement Ratio) -->
+        <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <div class="p-3 border rounded-3 bg-body-tertiary">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">
+                                <i class="fa-solid fa-chart-column text-primary me-2"></i> Machine Learning Accuracy Comparison
+                            </h6>
+                            <a href="{{ url_for('train') }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                Leaderboard &rarr;
+                            </a>
+                        </div>
+                        <div style="height: 310px; position: relative;">
+                            <canvas id="accuracyBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="p-3 border rounded-3 bg-body-tertiary">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">
+                                <i class="fa-solid fa-chart-pie text-success me-2"></i> Placement Ratio
+                            </h6>
+                            <span class="badge bg-success-subtle text-success">Dataset Ratio</span>
+                        </div>
+                        <div style="height: 310px; position: relative;" class="d-flex align-items-center justify-content-center">
+                            <canvas id="placementDoughnutChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Stream Breakdown -->
+        <div class="tab-pane fade" id="tab-stream" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <div class="p-3 border rounded-3 bg-body-tertiary">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fa-solid fa-chart-bar text-indigo me-2"></i> Placement Rate (%) by Academic Stream
+                        </h6>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="streamBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <h6 class="fw-bold mb-3">Stream Metrics Breakdown</h6>
+                    <div class="table-responsive border rounded-3">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Stream</th>
+                                    <th>Total Students</th>
+                                    <th>Placed</th>
+                                    <th>Placement %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stream, sdata in stream_analytics.items() %}
+                                <tr>
+                                    <td class="fw-semibold">{{ stream }}</td>
+                                    <td>{{ "{:,}".format(sdata.total) }}</td>
+                                    <td class="text-success font-semibold">{{ "{:,}".format(sdata.placed) }}</td>
+                                    <td>
+                                        <span class="badge bg-primary-subtle text-primary">{{ sdata.rate }}%</span>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="text-muted text-center py-3">Stream analytics available upon loading full dataset.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Academic CGPA Analytics -->
+        <div class="tab-pane fade" id="tab-cgpa" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <div class="p-3 border rounded-3 bg-body-tertiary">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fa-solid fa-chart-line text-warning me-2"></i> Placement Success Rate by CGPA Bins
+                        </h6>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="cgpaLineChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <h6 class="fw-bold mb-3">CGPA Distribution Table</h6>
+                    <div class="table-responsive border rounded-3">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>CGPA Range</th>
+                                    <th>Total Students</th>
+                                    <th>Placed Count</th>
+                                    <th>Placement %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for bin_lbl, cdata in cgpa_analytics.items() %}
+                                <tr>
+                                    <td class="fw-semibold">{{ bin_lbl }}</td>
+                                    <td>{{ "{:,}".format(cdata.total) }}</td>
+                                    <td class="text-success font-semibold">{{ "{:,}".format(cdata.placed) }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress flex-grow-1" style="height: 6px; width: 60px;">
+                                                <div class="progress-bar bg-success" style="width: {{ cdata.rate }}%;"></div>
+                                            </div>
+                                            <span class="fw-bold small">{{ cdata.rate }}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="4" class="text-muted text-center py-3">CGPA metrics calculated live from dataset.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Linear Regression Model Analytics -->
+        <div class="tab-pane fade" id="tab-regression" role="tabpanel">
+            <!-- Feature & Target Control Bar -->
+            <div class="p-3 mb-4 rounded-3 bg-body-tertiary border d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold text-main small"><i class="fa-solid fa-sliders text-info me-1"></i> Regression Variables:</span>
+                    <div class="input-group input-group-sm style-select-group" style="width: 220px;">
+                        <span class="input-group-text bg-body border-end-0 fw-semibold text-muted">X (Feature)</span>
+                        <select id="regFeatureSelect" class="form-select border-start-0 font-medium">
+                            {% for col in numeric_columns %}
+                            <option value="{{ col }}" {% if col == regression_data.feature_col %}selected{% endif %}>{{ col }}</option>
+                            {% else %}
+                            <option value="CGPA">CGPA</option>
+                            <option value="AptitudeTestScore">Aptitude Score</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="input-group input-group-sm style-select-group" style="width: 220px;">
+                        <span class="input-group-text bg-body border-end-0 fw-semibold text-muted">Y (Target)</span>
+                        <select id="regTargetSelect" class="form-select border-start-0 font-medium">
+                            {% for col in numeric_columns %}
+                            <option value="{{ col }}" {% if col == regression_data.target_col %}selected{% endif %}>{{ col }}</option>
+                            {% else %}
+                            <option value="PlacementStatus">Placement Status</option>
+                            <option value="SalaryPackage">Salary Package</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <button type="button" id="btnRunRegression" class="btn btn-sm btn-info text-white font-semibold px-3 py-1.5 rounded-2 d-flex align-items-center gap-1.5">
+                    <i class="fa-solid fa-calculator"></i> Fit Model & Update
+                </button>
+            </div>
+
+            <!-- Top Metric KPI Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="text-muted small font-semibold mb-1">R² Score (Goodness of Fit)</div>
+                        <h4 class="fw-bold text-info mb-0" id="regMetricR2">{{ regression_data.r2 if regression_data else "0.842" }}</h4>
+                        <span class="badge bg-info-subtle text-info mt-1 font-medium" id="regMetricR2Badge">Variance Explained</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="text-muted small font-semibold mb-1">Mean Squared Error (MSE)</div>
+                        <h4 class="fw-bold text-warning mb-0" id="regMetricMSE">{{ regression_data.mse if regression_data else "0.045" }}</h4>
+                        <span class="text-muted small" id="regMetricRMSE">RMSE: {{ regression_data.rmse if regression_data else "0.212" }}</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="text-muted small font-semibold mb-1">Slope Weight (w)</div>
+                        <h4 class="fw-bold text-primary mb-0" id="regMetricSlope">{{ regression_data.slope if regression_data else "0.184" }}</h4>
+                        <span class="text-muted small">ΔY per 1-unit ΔX</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="text-muted small font-semibold mb-1">Intercept Constant (b)</div>
+                        <h4 class="fw-bold text-success mb-0" id="regMetricIntercept">{{ regression_data.intercept if regression_data else "-0.452" }}</h4>
+                        <span class="text-muted small">Y-value at X = 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Charts Row -->
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">
+                                <i class="fa-solid fa-chart-line text-info me-2"></i> Linear Regression Fit & Data Scatter Plot
+                            </h6>
+                            <span class="badge bg-body border text-main font-monospace px-2.5 py-1" id="regEquationText">
+                                {{ regression_data.equation if regression_data else "y = 0.184 · x + (-0.452)" }}
+                            </span>
+                        </div>
+                        <div style="height: 320px; position: relative;">
+                            <canvas id="regressionScatterChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <h6 class="fw-bold mb-3">
+                                <i class="fa-solid fa-chart-bar text-warning me-2"></i> Residuals Error Distribution
+                            </h6>
+                            <div style="height: 220px; position: relative;" class="mb-3">
+                                <canvas id="residualsChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="p-2.5 rounded-3 bg-info-subtle border border-info-subtle text-info small">
+                            <i class="fa-solid fa-lightbulb me-1"></i> <strong>Model Insight:</strong> Residual errors distribution measures model unbiased variance around fitting line.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 5: Gradient Descent Interactive Simulator -->
+        <div class="tab-pane fade" id="tab-gd" role="tabpanel">
+            <!-- Parameter Control Panel -->
+            <div class="card-custom mb-4 p-3 border-start border-4 border-warning bg-body-tertiary">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-2 border-bottom">
+                    <h6 class="fw-bold mb-0 text-main">
+                        <i class="fa-solid fa-sliders text-warning me-2"></i> Optimization Hyperparameters Control
+                    </h6>
+                    <div class="d-flex gap-2">
+                        <button type="button" id="btnGDPlay" class="btn btn-sm btn-success px-3 fw-bold d-flex align-items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-play" id="gdPlayIcon"></i> <span id="gdPlayText">Start Optimization</span>
+                        </button>
+                        <button type="button" id="btnGDStep" class="btn btn-sm btn-outline-primary font-semibold px-3 d-flex align-items-center gap-1">
+                            <i class="fa-solid fa-forward-step"></i> Step
+                        </button>
+                        <button type="button" id="btnGDReset" class="btn btn-sm btn-outline-secondary font-semibold px-3 d-flex align-items-center gap-1">
+                            <i class="fa-solid fa-rotate-left"></i> Reset
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold text-muted mb-1 d-flex justify-content-between">
+                            <span>Learning Rate (α):</span>
+                            <span class="text-warning fw-bold" id="valLearningRate">0.05</span>
+                        </label>
+                        <input type="range" class="form-range" id="sliderLearningRate" min="0.001" max="0.5" step="0.005" value="0.05">
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold text-muted mb-1 d-flex justify-content-between">
+                            <span>Total Epochs:</span>
+                            <span class="text-primary fw-bold" id="valEpochs">50</span>
+                        </label>
+                        <input type="range" class="form-range" id="sliderEpochs" min="10" max="200" step="10" value="50">
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">Algorithm Variant:</label>
+                        <select id="selectGDType" class="form-select form-select-sm font-medium">
+                            <option value="batch" selected>Batch Gradient Descent</option>
+                            <option value="sgd">Stochastic GD (SGD)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 col-sm-6">
+                        <label class="form-label small fw-semibold text-muted mb-1">Initial Weight (w₀):</label>
+                        <input type="number" id="inputWInit" class="form-control form-control-sm font-medium" value="0.0" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dual Visualizers Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">
+                                <i class="fa-solid fa-chart-line text-warning me-2"></i> Cost Function Minimization J(w,b)
+                            </h6>
+                            <span class="badge bg-warning-subtle text-warning font-semibold" id="gdCostBadge">Loss: 0.0000</span>
+                        </div>
+                        <div style="height: 290px; position: relative;">
+                            <canvas id="gdLossChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="p-3 border rounded-3 bg-body-tertiary h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">
+                                <i class="fa-solid fa-diagram-project text-success me-2"></i> Live Line Fitting Convergence
+                            </h6>
+                            <span class="badge bg-success-subtle text-success font-semibold" id="gdLineBadge">w: 0.0, b: 0.0</span>
+                        </div>
+                        <div style="height: 290px; position: relative;">
+                            <canvas id="gdFitChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Telemetry Log Table -->
+            <div class="card-custom p-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-main">
+                        <i class="fa-solid fa-list-ol text-primary me-2"></i> Step Iteration Log Table
+                    </h6>
+                    <span class="badge bg-body border text-muted" id="gdStepCountBadge">Epoch 0 / 50</span>
+                </div>
+                <div class="table-responsive border rounded-3" style="max-height: 200px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0 small text-center" id="gdHistoryTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Epoch</th>
+                                <th>Norm Weight (w)</th>
+                                <th>Norm Bias (b)</th>
+                                <th>Cost Loss J(w,b)</th>
+                                <th>Gradient (∂J/∂w)</th>
+                                <th>Original Fit Equation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gdHistoryBody">
+                            <tr>
+                                <td colspan="6" class="text-muted py-3">Click 'Start Optimization' to run Gradient Descent simulator.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Quick Actions Shortcuts -->
+<div class="card-custom mb-4">
+    <div class="card-header-custom">
+        <h5 class="card-title-custom">
+            <i class="fa-solid fa-rocket text-primary"></i> System Quick Actions
+        </h5>
+    </div>
+    <div class="row g-3">
+        <div class="col-sm-6 col-md-3">
+            <a href="{{ url_for('prediction') }}" class="btn-primary-custom w-100 justify-content-center py-3 shadow-sm">
+                <i class="fa-solid fa-wand-magic-sparkles me-2 fs-5"></i> New Student Prediction
+            </a>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <a href="{{ url_for('preprocessing') }}" class="btn-outline-custom w-100 justify-content-center py-3">
+                <i class="fa-solid fa-sliders me-2 fs-5 text-indigo"></i> ML Preprocessing
+            </a>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <a href="{{ url_for('start_training') }}" class="btn-outline-custom w-100 justify-content-center py-3">
+                <i class="fa-solid fa-rotate me-2 fs-5 text-success"></i> Retrain All Models
+            </a>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <a href="{{ url_for('dataset_preview') }}" class="btn-outline-custom w-100 justify-content-center py-3">
+                <i class="fa-solid fa-magnifying-glass me-2 fs-5 text-primary"></i> Search Dataset
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Predictions Table -->
+<div class="card-custom">
+    <div class="card-header-custom">
+        <h5 class="card-title-custom">
+            <i class="fa-solid fa-clock-rotate-left text-warning"></i> Recent Prediction Activity Logs
+        </h5>
+        <a href="{{ url_for('history') }}" class="btn-outline-custom py-1 px-3 fs-7">
+            View All History
+        </a>
+    </div>
+
+    {% if recent_predictions %}
+    <div class="table-custom-container">
+        <table class="table-custom">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Student Name</th>
+                    <th>Prediction Status</th>
+                    <th>Confidence Score</th>
+                    <th>PDF Report</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in recent_predictions %}
+                <tr>
+                    <td class="text-muted"><i class="fa-regular fa-clock me-1"></i> {{ item.date }}</td>
+                    <td class="fw-semibold">{{ item.student_name }}</td>
+                    <td>
+                        {% if "Placed" in item.prediction and "Not" not in item.prediction %}
+                        <span class="badge-custom badge-success"><i class="fa-solid fa-circle-check"></i> Placed</span>
+                        {% else %}
+                        <span class="badge-custom badge-danger"><i class="fa-solid fa-circle-xmark"></i> Not Placed</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2" style="width: 140px;">
+                            <div class="progress flex-grow-1" style="height: 6px; background-color: var(--border-color);">
+                                <div class="progress-bar {% if 'Placed' in item.prediction and 'Not' not in item.prediction %}bg-success{% else %}bg-danger{% endif %}" 
+                                     style="width: {{ item.confidence or 85 }}%;"></div>
+                            </div>
+                            <span class="fw-bold small">{{ item.confidence or 85 }}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        {% if item.report %}
+                        <a href="{{ url_for('download_saved_report', filename=item.report) }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                            <i class="fa-solid fa-file-pdf"></i> PDF
+                        </a>
+                        {% else %}
+                        <span class="text-muted fs-7">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">
+        <i class="fa-solid fa-inbox fs-2 mb-2 d-block"></i>
+        <p class="mb-2">No recent predictions recorded yet.</p>
+        <a href="{{ url_for('prediction') }}" class="btn-primary-custom py-1.5 px-3 fs-7">
+            Make First Prediction
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Upload Dataset Modal -->
+<div class="modal fade" id="uploadDatasetModal" tabindex="-1" aria-labelledby="uploadDatasetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="uploadDatasetModalLabel">
+                    <i class="fa-solid fa-cloud-arrow-up text-success"></i> Upload Dataset File
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('upload_dataset') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="redirect_to" value="dashboard">
+                <div class="modal-body py-4">
+                    <div class="mb-3 text-center p-4 border border-2 border-dashed rounded-3 bg-body-tertiary">
+                        <i class="fa-solid fa-file-excel fs-1 text-success mb-2"></i>
+                        <h6 class="fw-bold mb-1">Select or Drag Dataset File</h6>
+                        <p class="text-muted small mb-3">Upload your Excel (.xlsx, .xls) or CSV (.csv) student data</p>
+                        <input type="file" name="dataset" class="form-control" accept=".csv, .xlsx, .xls" required>
+                    </div>
+                    <div class="alert alert-info py-2 px-3 small d-flex align-items-center gap-2 mb-0 rounded-3">
+                        <i class="fa-solid fa-lightbulb text-info fs-5"></i>
+                        <span>Uploading a new dataset will instantly re-calculate all statistics, placement rates, and stream distributions on your dashboard.</span>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-3 px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success btn-glow rounded-3 px-4 fw-bold">
+                        <i class="fa-solid fa-upload me-1"></i> Upload Dataset
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

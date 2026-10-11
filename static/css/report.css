@@ -1,0 +1,33 @@
+body{
+
+    background:#f4f7fb;
+
+}
+
+.card{
+
+    border:none;
+
+    border-radius:15px;
+
+    transition:.3s;
+
+}
+
+.card:hover{
+
+    transform:translateY(-6px);
+
+}
+
+.fa-file-pdf{
+
+    color:#dc3545;
+
+}
+
+.btn{
+
+    border-radius:8px;
+
+}

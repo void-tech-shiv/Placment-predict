@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}PDF Reports - PlacementAI{% endblock %}
+{% block page_header %}<i class="fa-solid fa-file-pdf text-danger me-2"></i> Prediction Reports{% endblock %}
+{% block content %}
+<div class="card-custom"><div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-folder-open text-primary"></i> Generated Reports</h5><span class="badge-custom badge-primary">{{ total_reports }} total</span></div><input type="search" id="searchReport" class="form-control-custom mb-3" placeholder="Search by report or student name..."><div class="row g-3" id="reportContainer">{% for report in reports %}<div class="col-md-6 col-xl-4 report-card"><div class="border rounded-3 p-3 h-100 bg-card"><div class="d-flex align-items-start gap-3"><i class="fa-solid fa-file-pdf fs-2 text-danger"></i><div class="min-w-0"><div class="fw-bold text-truncate">{{ report.student_name }}</div><div class="small text-muted text-truncate">{{ report.name }}</div><div class="small text-muted mt-1">{{ report.date }} - {{ report.size }}</div></div></div><a href="{{ url_for('download_saved_report', filename=report.name) }}" class="btn-outline-custom w-100 justify-content-center mt-3"><i class="fa-solid fa-download"></i> Download</a></div></div>{% else %}<div class="text-center py-5 text-muted">No reports available yet.</div>{% endfor %}</div></div>
+{% endblock %}
+{% block extra_scripts %}<script src="{{ url_for('static', filename='js/report.js') }}"></script>{% endblock %}

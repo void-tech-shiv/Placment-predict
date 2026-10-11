@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Model Leaderboard - PlacementAI{% endblock %}
+{% block page_header %}<i class="fa-solid fa-brain text-primary me-2"></i> Model Training & Leaderboard{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="card-custom h-100">
+      <div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-play text-success"></i> Train Models</h5></div>
+      <p class="text-muted small">Training uses the current active dataset with cross-validation and a final test split.</p>
+      {% if session.get('user', {}).get('role') == 'Admin' %}
+      <button id="trainBtn" class="btn-primary-custom w-100 justify-content-center"><i class="fa-solid fa-bolt"></i> Start Training</button>
+      {% else %}<div class="alert alert-info small mb-0">Administrator access is required to retrain shared models.</div>{% endif %}
+      <div id="status" class="small text-muted mt-3">Ready.</div>
+      <div class="progress mt-2" style="height:10px"><div id="progressBar" class="progress-bar progress-bar-striped" style="width:0%"></div></div>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="card-custom h-100">
+      <div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-trophy text-warning"></i> Model Accuracy</h5>{% if best_model %}<span class="badge-custom badge-success">Best: {{ best_model }} - {{ best_accuracy }}%</span>{% endif %}</div>
+      {% if accuracy %}<div style="height:320px"><canvas id="accuracyChart"></canvas></div>{% else %}<div class="text-center py-5 text-muted">No trained leaderboard yet.</div>{% endif %}
+    </div>
+  </div>
+</div>
+<div class="card-custom mt-4">
+  <div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-table-list text-primary"></i> Accuracy Table</h5></div>
+  <div class="table-responsive"><table class="table align-middle mb-0"><thead class="table-light"><tr><th>Model</th><th>Cross-validation Accuracy</th></tr></thead><tbody>{% for model, score in accuracy.items() %}<tr><td class="fw-semibold">{{ model }}</td><td>{{ score }}%</td></tr>{% else %}<tr><td colspan="2" class="text-center text-muted py-4">No model results available.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<script>window.accuracyData = {{ accuracy|tojson }};</script>
+{% endblock %}
+{% block extra_scripts %}<script src="{{ url_for('static', filename='js/train.js') }}"></script>{% endblock %}
