@@ -1,9 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/:path*",
-      "destination": "https://placement-predict-0vnt.onrender.com/:path*"
+      "src": "/",
+      "dest": "https://placement-predict-0vnt.onrender.com/"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "https://placement-predict-0vnt.onrender.com/$1"
     }
   ]
 }
