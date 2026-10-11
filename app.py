@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import secrets
@@ -28,11 +29,17 @@ from flask_wtf.csrf import CSRFProtect
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler, RobustScaler, StandardScaler
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from prediction.predict import Predictor
 from prediction.report_generator import ReportGenerator
+from db_store import (
+    admin_snapshot, create_user as db_create_user, db_enabled, ensure_admin, fetch_history,
+    fetch_users, increment_metric, record_request, save_history, set_user_active,
+    set_user_role, touch_login,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
@@ -54,7 +61,9 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "0") == "1",
     WTF_CSRF_TIME_LIMIT=None,
+    WTF_CSRF_SSL_STRICT=False,
 )
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 csrf = CSRFProtect(app)
 
 if not os.environ.get("SECRET_KEY"):
@@ -95,11 +104,15 @@ def init_runtime_state():
     admin_email = os.environ.get("INITIAL_ADMIN_EMAIL", "").strip().lower()
     admin_password = os.environ.get("INITIAL_ADMIN_PASSWORD", "")
     admin_name = os.environ.get("INITIAL_ADMIN_NAME", "Project Admin").strip() or "Project Admin"
+    if db_enabled():
+        if admin_email and admin_password:
+            ensure_admin(admin_email, generate_password_hash(admin_password), admin_name)
+        return
     if admin_email and admin_password:
         with _json_lock:
             users = _load_json(USERS_FILE, [])
             if not any(u.get("email", "").lower() == admin_email for u in users):
-                users.append({"email": admin_email, "name": admin_name, "password": generate_password_hash(admin_password), "role": "Admin"})
+                users.append({"email": admin_email, "name": admin_name, "password": generate_password_hash(admin_password), "role": "Admin", "is_active": True})
                 _atomic_json_write(USERS_FILE, users)
 
 
@@ -107,12 +120,17 @@ init_runtime_state()
 
 
 def load_users():
+    if db_enabled():
+        return fetch_users()
     return _load_json(USERS_FILE, [])
 
 
 def save_user(user_data):
+    if db_enabled():
+        return db_create_user(user_data["name"], user_data["email"], user_data["password"], user_data.get("role", "Student"))
     with _json_lock:
         users = load_users()
+        user_data.setdefault("is_active", True)
         users.append(user_data)
         _atomic_json_write(USERS_FILE, users)
 
@@ -127,12 +145,19 @@ def verify_user_password(stored_password, provided_password):
 
 
 def load_history():
+    if db_enabled():
+        user = session.get("user", {})
+        return fetch_history(user.get("email"), user.get("role") == "Admin")
     return _load_json(HISTORY_FILE, [])
 
 
 def save_prediction_history(student_data, prediction, confidence, report_name):
     user = session.get("user", {})
     label = "Placed" if str(prediction).strip().lower().startswith("placed") else "Not Placed"
+    if db_enabled():
+        save_history(student_data, prediction, label, confidence, report_name, user.get("email", ""))
+        increment_metric("predictions")
+        return
     with _json_lock:
         history = load_history()
         next_id = max([int(item.get("id", 0)) for item in history] or [0]) + 1
@@ -181,6 +206,21 @@ def admin_required(view):
             return redirect(url_for("dashboard"))
         return view(*args, **kwargs)
     return wrapped
+
+
+@app.before_request
+def track_request():
+    if not db_enabled() or request.path.startswith("/static/"):
+        return
+    try:
+        visitor = session.get("_visitor_id")
+        if not visitor:
+            visitor = secrets.token_hex(16)
+            session["_visitor_id"] = visitor
+        digest = hashlib.sha256((visitor + app.config["SECRET_KEY"]).encode()).hexdigest()
+        record_request(request.path, digest, "user" in session)
+    except Exception as exc:
+        print("Traffic tracking warning:", exc)
 
 
 def allowed_dataset(filename):
@@ -269,9 +309,15 @@ def login():
         if not user_match or not verify_user_password(user_match.get("password"), password):
             flash("Invalid email or password.", "danger")
             return redirect(url_for("login"))
+        if user_match.get("is_active") is False:
+            flash("This account has been disabled by an administrator.", "danger")
+            return redirect(url_for("login"))
         session.clear()
         session.permanent = True
         session["user"] = {"name": user_match.get("name", "User"), "email": user_match.get("email", email), "role": user_match.get("role", "Student")}
+        if db_enabled():
+            touch_login(email)
+            increment_metric("logins")
         flash(f"Welcome back, {session['user']['name']}!", "success")
         return redirect(url_for("dashboard"))
     return render_template("login.html")
@@ -294,6 +340,8 @@ def register():
             return redirect(url_for("register"))
         role = "Admin" if not users else "Student"
         save_user({"name": name, "email": email, "password": generate_password_hash(password), "role": role})
+        if db_enabled():
+            increment_metric("registrations")
         session.clear()
         session.permanent = True
         session["user"] = {"name": name, "email": email, "role": role}
@@ -673,6 +721,48 @@ def report():
 @login_required
 def download_saved_report(filename):
     return _send_authorized_report(filename)
+
+
+@app.route("/admin")
+@admin_required
+def admin_console():
+    if not db_enabled():
+        flash("Admin analytics requires Neon / DATABASE_URL.", "warning")
+        return redirect(url_for("dashboard"))
+    return render_template("admin.html", users=fetch_users(), stats=admin_snapshot())
+
+
+@app.route("/admin/users/<int:user_id>/toggle", methods=["POST"])
+@admin_required
+def admin_toggle_user(user_id):
+    users = fetch_users() if db_enabled() else []
+    target = next((u for u in users if int(u.get("id", 0)) == user_id), None)
+    if not target:
+        flash("User not found.", "danger")
+    elif target.get("email") == session.get("user", {}).get("email"):
+        flash("You cannot disable your own administrator account.", "warning")
+    else:
+        set_user_active(user_id, not bool(target.get("is_active")))
+        flash("User status updated.", "success")
+    return redirect(url_for("admin_console"))
+
+
+@app.route("/admin/users/<int:user_id>/role", methods=["POST"])
+@admin_required
+def admin_change_role(user_id):
+    role = request.form.get("role", "Student")
+    users = fetch_users() if db_enabled() else []
+    target = next((u for u in users if int(u.get("id", 0)) == user_id), None)
+    if not target:
+        flash("User not found.", "danger")
+    elif target.get("email") == session.get("user", {}).get("email"):
+        flash("You cannot change your own administrator role here.", "warning")
+    elif role not in {"Admin", "Student"}:
+        flash("Invalid role.", "danger")
+    else:
+        set_user_role(user_id, role)
+        flash(f"{target.get('name','User')} is now {role}.", "success")
+    return redirect(url_for("admin_console"))
 
 
 @app.errorhandler(413)
