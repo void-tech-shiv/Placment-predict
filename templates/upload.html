@@ -1,8 +1,106 @@
 {% extends "base.html" %}
-{% block title %}Dataset & Search - PlacementAI{% endblock %}
-{% block page_header %}<i class="fa-solid fa-database text-primary me-2"></i> Dataset Explorer & Export{% endblock %}
+{% block title %}Dataset Explorer - Placement Predict{% endblock %}
+{% block page_header %}<i class="fa-solid fa-database text-primary me-2"></i> Dataset Explorer{% endblock %}
 {% block content %}
-<div class="row g-4 mb-4"><div class="col-lg-5"><div class="card-custom h-100"><div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-cloud-arrow-up text-primary"></i> Replace Active Dataset</h5></div>{% if session.get('user', {}).get('role') == 'Admin' %}<form action="{{ url_for('upload_dataset') }}" method="POST" enctype="multipart/form-data"><div class="mb-3 text-center p-4 border rounded-3" style="border-style:dashed!important;background:var(--bg-body)"><i class="fa-solid fa-file-excel fs-1 text-success mb-2"></i><h6>CSV or Excel (.xlsx)</h6><p class="text-muted small">Maximum upload size: 20 MB.</p><input type="file" name="dataset" accept=".csv,.xlsx" class="form-control" required></div><button type="submit" class="btn-primary-custom w-100 justify-content-center"><i class="fa-solid fa-upload"></i> Upload Dataset</button></form>{% else %}<div class="alert alert-info mb-0"><i class="fa-solid fa-lock me-1"></i> Only an Administrator can replace the shared dataset.</div>{% endif %}</div></div><div class="col-lg-7"><div class="card-custom h-100 d-flex flex-column justify-content-between"><div><div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-table-list text-info"></i> Active Dataset Summary</h5>{% if dataset_name %}<span class="badge-custom badge-success">Loaded</span>{% endif %}</div><div class="row g-3"><div class="col-sm-7"><div class="p-3 rounded-3 border bg-card"><small class="text-muted text-uppercase fw-bold fs-7">Active File</small><h6 class="fw-bold mb-0 mt-1 text-truncate">{{ dataset_name or 'No Dataset' }}</h6></div></div><div class="col-sm-5"><div class="p-3 rounded-3 border bg-card"><small class="text-muted text-uppercase fw-bold fs-7">Total Rows</small><h6 class="fw-bold mb-0 mt-1">{{ "{:,}".format(total_count or 0) }}</h6></div></div></div></div><div class="d-flex flex-wrap gap-2 mt-4"><a href="{{ url_for('export_csv') }}" class="btn-outline-custom flex-grow-1 justify-content-center"><i class="fa-solid fa-file-csv text-success"></i> CSV</a><a href="{{ url_for('export_excel') }}" class="btn-outline-custom flex-grow-1 justify-content-center"><i class="fa-solid fa-file-excel text-primary"></i> Excel</a></div></div></div></div>
-<div class="card-custom"><div class="card-header-custom flex-wrap"><h5 class="card-title-custom"><i class="fa-solid fa-magnifying-glass text-warning"></i> Dataset Search</h5><span class="text-muted small">Showing <strong id="visibleRecordCount" class="text-primary">{{ rows_data|length }}</strong> of {{ total_count or 0 }} preview rows</span></div><div class="row g-3 mb-3"><div class="col-md-8"><input type="search" id="datasetSearchInput" class="form-control-custom" placeholder="Search visible dataset rows..."></div><div class="col-md-4"><select id="statusFilterSelect" class="form-control-custom"><option value="all">All placement statuses</option><option value="placed">Placed only</option><option value="not_placed">Not placed only</option></select></div></div>{% if columns and rows_data %}<div class="table-custom-container" style="max-height:520px"><table class="table-custom"><thead style="position:sticky;top:0;z-index:10"><tr><th>#</th>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead><tbody id="datasetTableBody">{% for row in rows_data %}<tr data-status="{{ row.get('PlacementStatus',row.get('Placed',row.get('Status',''))) }}"><td>{{ loop.index }}</td>{% for col in columns %}<td>{% if col in ['PlacementStatus','Placed','Status'] %}{% if row[col] in [1,'1','Placed','placed','Yes','yes',True] %}<span class="badge-custom badge-success">Placed</span>{% else %}<span class="badge-custom badge-danger">Not Placed</span>{% endif %}{% else %}{{ row[col] }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% else %}<div class="text-center py-5 text-muted">No dataset preview available.</div>{% endif %}</div>
+<div class="pp-page-intro">
+  <div>
+    <h2>Inspect and manage the active dataset</h2>
+    <p>Upload a CSV/XLSX file, review a live data preview, search records, filter placement status, and export the dataset.</p>
+  </div>
+  <span class="pp-chip"><i class="fa-solid fa-table"></i> {{ "{:,}".format(total_count or 0) }} rows</span>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-5">
+    <section class="pp-panel h-100">
+      <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Dataset source</div>
+      <h5 class="fw-bold mb-3">Replace Active Dataset</h5>
+      {% if session.get('user', {}).get('role') == 'Admin' %}
+      <form action="{{ url_for('upload_dataset') }}" method="POST" enctype="multipart/form-data">
+        <div class="pp-upload-zone mb-3">
+          <i class="fa-solid fa-cloud-arrow-up mb-3"></i>
+          <h6 class="fw-bold">Choose a dataset file</h6>
+          <p class="text-muted small mb-3">CSV or Excel (.xlsx), maximum 20 MB.</p>
+          <input type="file" name="dataset" accept=".csv,.xlsx" class="form-control" required>
+        </div>
+        <button type="submit" class="btn-primary-custom w-100 justify-content-center py-2.5">
+          <i class="fa-solid fa-upload"></i> Upload & Activate Dataset
+        </button>
+      </form>
+      {% else %}
+      <div class="alert alert-info mb-0"><i class="fa-solid fa-lock me-1"></i> Only an Administrator can replace the shared dataset.</div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="col-lg-7">
+    <section class="pp-panel h-100 d-flex flex-column justify-content-between">
+      <div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+          <div>
+            <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Current workspace</div>
+            <h5 class="fw-bold mb-0">Active Dataset</h5>
+          </div>
+          {% if dataset_name %}<span class="badge-custom badge-success"><i class="fa-solid fa-circle-check me-1"></i>Loaded</span>{% endif %}
+        </div>
+
+        <div class="row g-3">
+          <div class="col-sm-7"><div class="pp-metric-tile"><span>Active file</span><strong class="text-truncate" title="{{ dataset_name or 'No Dataset' }}">{{ dataset_name or 'No Dataset' }}</strong></div></div>
+          <div class="col-sm-5"><div class="pp-metric-tile"><span>Total rows</span><strong>{{ "{:,}".format(total_count or 0) }}</strong></div></div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-4">
+        <a href="{{ url_for('export_csv') }}" class="btn-outline-custom flex-grow-1 justify-content-center"><i class="fa-solid fa-file-csv text-success"></i> Export CSV</a>
+        <a href="{{ url_for('export_excel') }}" class="btn-outline-custom flex-grow-1 justify-content-center"><i class="fa-solid fa-file-excel text-primary"></i> Export Excel</a>
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="pp-panel">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div>
+      <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Data preview</div>
+      <h5 class="fw-bold mb-0">Search Dataset Records</h5>
+    </div>
+    <span class="small text-muted">Showing <strong id="visibleRecordCount" class="text-primary">{{ rows_data|length }}</strong> of {{ total_count or 0 }} preview rows</span>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-8"><input type="search" id="datasetSearchInput" class="form-control-custom" placeholder="Search visible dataset rows..."></div>
+    <div class="col-md-4">
+      <select id="statusFilterSelect" class="form-control-custom">
+        <option value="all">All placement statuses</option>
+        <option value="placed">Placed only</option>
+        <option value="not_placed">Not placed only</option>
+      </select>
+    </div>
+  </div>
+
+  {% if columns and rows_data %}
+  <div class="table-custom-container" style="max-height:560px">
+    <table class="table-custom">
+      <thead style="position:sticky;top:0;z-index:10"><tr><th>#</th>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <tbody id="datasetTableBody">
+        {% for row in rows_data %}
+        <tr data-status="{{ row.get('PlacementStatus',row.get('Placed',row.get('Status',''))) }}">
+          <td>{{ loop.index }}</td>
+          {% for col in columns %}
+          <td>
+            {% if col in ['PlacementStatus','Placed','Status'] %}
+              {% if row[col] in [1,'1','Placed','placed','Yes','yes',True] %}<span class="badge-custom badge-success">Placed</span>{% else %}<span class="badge-custom badge-danger">Not Placed</span>{% endif %}
+            {% else %}{{ row[col] }}{% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="pp-result-placeholder"><div><i class="fa-solid fa-table fs-2 mb-3"></i><div>No dataset preview available.</div></div></div>
+  {% endif %}
+</section>
 {% endblock %}
 {% block extra_scripts %}<script src="{{ url_for('static', filename='js/upload.js') }}"></script>{% endblock %}
