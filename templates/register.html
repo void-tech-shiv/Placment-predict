@@ -1,50 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Create Account - Placement Predict{% endblock %}
-{% block page_header %}<i class="fa-solid fa-user-plus text-primary me-2"></i> Create Account{% endblock %}
 {% block content %}
-<div class="auth-shell">
-  <section class="auth-aside">
-    <div>
-      <div class="auth-kicker">Placement Predict</div>
-      <h2>Build a complete placement-analysis workflow.</h2>
-      <p>Create an account to explore the dataset, inspect model performance, and generate student placement predictions.</p>
-      <div class="auth-points">
-        <div class="auth-point"><i class="fa-solid fa-database"></i><span>Dataset exploration and export</span></div>
-        <div class="auth-point"><i class="fa-solid fa-gears"></i><span>Preprocessing and model training</span></div>
-        <div class="auth-point"><i class="fa-solid fa-bolt"></i><span>Placement prediction and reporting</span></div>
-      </div>
-    </div>
-    <small>First account becomes Administrator</small>
-  </section>
-
+<div class="auth-shell auth-single auth-single-wide">
   <section class="auth-card">
     <div class="auth-icon"><i class="fa-solid fa-user-plus"></i></div>
-    <h3>Create your account</h3>
-    <p class="text-muted small mb-4">The first registered account becomes Administrator. Later registrations become Student accounts.</p>
+    <div class="auth-kicker auth-kicker-dark">PLACEMENT PREDICT</div>
+    <h3>Create account</h3>
+    <p class="text-muted small mb-4">Create your workspace account. The first account on a fresh setup becomes Administrator.</p>
 
     <form action="{{ url_for('register') }}" method="POST">
-      <div class="mb-3">
-        <label class="form-label-custom" for="registerName">Full name</label>
-        <input id="registerName" class="form-control-custom" name="name" autocomplete="name" placeholder="Your full name" required>
-      </div>
-      <div class="mb-3">
-        <label class="form-label-custom" for="registerEmail">Email address</label>
-        <input id="registerEmail" class="form-control-custom" type="email" name="email" autocomplete="email" placeholder="name@example.com" required>
-      </div>
-      <div class="mb-4">
-        <label class="form-label-custom" for="registerPassword">Password</label>
-        <input id="registerPassword" class="form-control-custom" type="password" name="password" minlength="6" autocomplete="new-password" placeholder="Minimum 6 characters" required>
-        <div class="form-text">Use at least 6 characters.</div>
-      </div>
-      <button type="submit" class="btn-primary-custom w-100 justify-content-center py-2.5">
-        <i class="fa-solid fa-user-check"></i> Create Account
-      </button>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3"><label class="form-label-custom" for="registerName">Full name</label><input id="registerName" class="form-control-custom" name="name" autocomplete="name" placeholder="Your full name" required></div>
+      <div class="mb-3"><label class="form-label-custom" for="registerEmail">Email address</label><input id="registerEmail" class="form-control-custom" type="email" name="email" autocomplete="email" placeholder="name@example.com" required></div>
+      <div class="mb-4"><label class="form-label-custom" for="registerPassword">Password</label><input id="registerPassword" class="form-control-custom" type="password" name="password" minlength="6" autocomplete="new-password" placeholder="Minimum 6 characters" required><div class="form-text">Use at least 6 characters.</div></div>
+      <button type="submit" class="btn-primary-custom w-100 justify-content-center py-2.5"><i class="fa-solid fa-user-check"></i> Create Account</button>
     </form>
 
-    <div class="auth-switch">
-      <span class="text-muted small">Already registered? </span>
-      <a href="{{ url_for('login') }}" class="fw-bold text-decoration-none text-primary">Sign in</a>
-    </div>
+    <div class="auth-switch"><span class="text-muted small">Already registered? </span><a href="{{ url_for('login') }}" class="fw-bold text-decoration-none text-primary">Sign in</a></div>
   </section>
 </div>
 {% endblock %}
