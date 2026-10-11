@@ -11,7 +11,7 @@ Render service URL:
 
 `https://placement-predict-0vnt.onrender.com`
 
-The Vercel proxy is configured in `vercel.json`.
+The Vercel proxy is configured in `vercel.json` and the GitHub repository is linked to the Vercel project so updates on `main` can trigger deployment automatically.
 
 ## Production notes
 
