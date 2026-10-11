@@ -4,64 +4,130 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}Placement Prediction System{% endblock %}</title>
+    <meta name="theme-color" content="#0f766e">
+    <title>{% block title %}Placement Predict{% endblock %}</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/placement-predict.css') }}">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 </head>
 <body data-user-role="{{ session.get('user', {}).get('role', '') }}">
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-<div class="app-wrapper">
-    <aside class="app-sidebar" aria-label="Primary navigation">
-        <div class="sidebar-brand"><i class="fa-solid fa-graduation-cap"></i><span>PlacementAI</span></div>
-        <nav class="sidebar-nav">
-            <div class="nav-heading">Main Overview</div>
-            <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-chart-pie"></i><span>Dashboard</span></a>
-            <a href="{{ url_for('dataset_preview') }}" class="{% if request.endpoint in ['upload_dataset','dataset_preview'] %}active{% endif %}"><i class="fa-solid fa-database"></i><span>Dataset & Search</span></a>
-            <a href="{{ url_for('eda') }}" class="{% if request.endpoint == 'eda' %}active{% endif %}"><i class="fa-solid fa-chart-line"></i><span>EDA Analytics</span></a>
-            <div class="nav-heading">Machine Learning</div>
-            <a href="{{ url_for('preprocessing') }}" class="{% if request.endpoint in ['preprocessing','download_preprocessed'] %}active{% endif %}"><i class="fa-solid fa-sliders"></i><span>Data Preprocessing</span></a>
-            <a href="{{ url_for('train') }}" class="{% if request.endpoint == 'train' %}active{% endif %}"><i class="fa-solid fa-brain"></i><span>Model Leaderboard</span></a>
-            <a href="{{ url_for('prediction') }}" class="{% if request.endpoint in ['prediction','predict'] %}active{% endif %}"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Predict Placement</span></a>
-            <div class="nav-heading">Records & Reports</div>
-            <a href="{{ url_for('history') }}" class="{% if request.endpoint == 'history' %}active{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i><span>Prediction History</span></a>
-            <a href="{{ url_for('report') }}" class="{% if request.endpoint in ['report','download_saved_report'] %}active{% endif %}"><i class="fa-solid fa-file-pdf"></i><span>PDF Reports</span></a>
-        </nav>
-        <div class="sidebar-footer"><div><i class="fa-solid fa-shield-halved text-success me-1"></i> System Active</div><small>PlacementAI v2.1</small></div>
-    </aside>
-    <div class="app-main">
-        <header class="app-header">
-            <div class="header-left">
-                <button class="mobile-sidebar-btn" id="mobileSidebarToggle" aria-label="Open navigation" aria-expanded="false"><i class="fa-solid fa-bars"></i></button>
-                <div class="header-title">{% block page_header %}Dashboard{% endblock %}</div>
+
+<div class="app-wrapper pp-shell">
+    <aside class="app-sidebar pp-sidebar" aria-label="Primary navigation">
+        <div class="sidebar-brand pp-brand">
+            <div class="pp-brand-mark" aria-hidden="true">PP</div>
+            <div class="pp-brand-copy">
+                <strong>Placement Predict</strong>
+                <span>ML Placement Lab</span>
             </div>
+        </div>
+
+        <nav class="sidebar-nav pp-nav">
+            <div class="nav-heading">Workspace</div>
+            <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <i class="fa-solid fa-chart-pie"></i><span>Overview</span>
+            </a>
+            <a href="{{ url_for('dataset_preview') }}" class="{% if request.endpoint in ['upload_dataset','dataset_preview'] %}active{% endif %}">
+                <i class="fa-solid fa-database"></i><span>Dataset Explorer</span>
+            </a>
+            <a href="{{ url_for('eda') }}" class="{% if request.endpoint == 'eda' %}active{% endif %}">
+                <i class="fa-solid fa-chart-line"></i><span>EDA Insights</span>
+            </a>
+
+            <div class="nav-heading">Machine Learning</div>
+            <a href="{{ url_for('preprocessing') }}" class="{% if request.endpoint in ['preprocessing','download_preprocessed'] %}active{% endif %}">
+                <i class="fa-solid fa-sliders"></i><span>Preprocessing</span>
+            </a>
+            <a href="{{ url_for('train') }}" class="{% if request.endpoint == 'train' %}active{% endif %}">
+                <i class="fa-solid fa-brain"></i><span>Model Training</span>
+            </a>
+            <a href="{{ url_for('prediction') }}" class="{% if request.endpoint in ['prediction','predict'] %}active{% endif %}">
+                <i class="fa-solid fa-bolt"></i><span>Placement Predictor</span>
+            </a>
+
+            <div class="nav-heading">Records</div>
+            <a href="{{ url_for('history') }}" class="{% if request.endpoint == 'history' %}active{% endif %}">
+                <i class="fa-solid fa-clock-rotate-left"></i><span>Prediction History</span>
+            </a>
+            <a href="{{ url_for('report') }}" class="{% if request.endpoint in ['report','download_saved_report'] %}active{% endif %}">
+                <i class="fa-solid fa-file-pdf"></i><span>Reports</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer pp-sidebar-footer">
+            <div class="pp-system-status"><span class="pp-status-dot"></span><span>System online</span></div>
+            <small>Placement Predict · v1.0</small>
+        </div>
+    </aside>
+
+    <div class="app-main pp-main">
+        <header class="app-header pp-header">
+            <div class="header-left">
+                <button class="mobile-sidebar-btn" id="mobileSidebarToggle" type="button" aria-label="Open navigation" aria-expanded="false">
+                    <i class="fa-solid fa-bars-staggered"></i>
+                </button>
+                <div>
+                    <div class="pp-eyebrow">PLACEMENT PREDICT</div>
+                    <div class="header-title">{% block page_header %}Overview{% endblock %}</div>
+                </div>
+            </div>
+
             <div class="header-actions">
-                <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle theme"><i id="themeToggleIcon" class="fa-solid fa-moon"></i><span id="themeToggleText">Dark Mode</span></button>
+                <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle theme">
+                    <i id="themeToggleIcon" class="fa-solid fa-moon"></i>
+                    <span id="themeToggleText">Dark Mode</span>
+                </button>
+
                 {% if session.get('user') %}
-                <div class="user-badge">
+                <div class="user-badge pp-user-chip">
                     <div class="user-avatar">{{ session.get('user', {}).get('name', 'U')[0] | upper }}</div>
-                    <div class="user-meta"><div class="fw-bold user-name">{{ session.get('user', {}).get('name', 'User') }}</div><small>{{ session.get('user', {}).get('role', 'Student') }}</small></div>
-                    <form method="POST" action="{{ url_for('logout') }}" class="logout-form mb-0"><button type="submit" class="icon-button text-danger" title="Logout" aria-label="Logout"><i class="fa-solid fa-right-from-bracket"></i></button></form>
+                    <div class="user-meta">
+                        <div class="fw-bold user-name">{{ session.get('user', {}).get('name', 'User') }}</div>
+                        <small>{{ session.get('user', {}).get('role', 'Student') }}</small>
+                    </div>
+                    <form method="POST" action="{{ url_for('logout') }}" class="logout-form mb-0">
+                        <button type="submit" class="icon-button text-danger" title="Logout" aria-label="Logout">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                        </button>
+                    </form>
                 </div>
                 {% else %}
-                <a href="{{ url_for('login') }}" class="btn-primary-custom py-1 px-3"><i class="fa-solid fa-right-to-bracket"></i> Login</a>
+                <a href="{{ url_for('login') }}" class="btn-primary-custom pp-login-link">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign in
+                </a>
                 {% endif %}
             </div>
         </header>
-        <main class="content-body page-fade-in">
+
+        <main class="content-body page-fade-in pp-content">
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}<div class="mb-4">{% for category, message in messages %}<div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show shadow-sm rounded-3 d-flex align-items-center gap-2" role="alert"><i class="fa-solid {% if category == 'success' %}fa-circle-check text-success{% elif category in ['danger','error'] %}fa-triangle-exclamation text-danger{% else %}fa-circle-info text-info{% endif %}"></i><div class="flex-grow-1 fw-semibold">{{ message }}</div><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}</div>{% endif %}
+                {% if messages %}
+                <div class="mb-4 pp-alert-stack">
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show pp-alert" role="alert">
+                        <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category in ['danger','error'] %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %}"></i>
+                        <div class="flex-grow-1 fw-semibold">{{ message }}</div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             {% endwith %}
+
             {% block content %}{% endblock %}
         </main>
     </div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% block extra_scripts %}{% endblock %}

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Placement Prediction System{% endblock %}
+{% block title %}Dashboard - Placement Predict{% endblock %}
 
 {% block page_header %}
 <i class="fa-solid fa-chart-pie text-primary me-2"></i> Placement Analytics Dashboard
@@ -24,7 +24,7 @@
         <div>
             <div class="d-flex align-items-center gap-2 mb-2">
                 <span class="badge bg-primary-subtle text-primary font-semibold px-3 py-1.5 rounded-pill">
-                    <i class="fa-solid fa-graduation-cap me-1"></i> PlacementAI Dashboard
+                    <i class="fa-solid fa-graduation-cap me-1"></i> Placement Predict Dashboard
                 </span>
                 <span class="badge bg-success-subtle text-success font-semibold px-3 py-1.5 rounded-pill">
                     <i class="fa-solid fa-circle-dot me-1 text-success pulse-dot"></i> Live Dataset: {{ dataset_name }}
@@ -68,10 +68,10 @@
                     <span class="input-group-text bg-body-tertiary border-end-0 text-muted">
                         <i class="fa-solid fa-file-excel text-success"></i>
                     </span>
-                    <input type="file" name="dataset" class="form-control-custom border-start-0" accept=".csv, .xlsx, .xls" required>
+                    <input type="file" name="dataset" class="form-control-custom border-start-0" accept=".csv,.xlsx" required>
                 </div>
                 <div class="form-text text-muted small mt-1">
-                    <i class="fa-solid fa-circle-info text-primary me-1"></i> Supports <strong>CSV</strong> and <strong>Excel (.xlsx, .xls)</strong> files. Dashboard graphs, counts, and analytics refresh instantly.
+                    <i class="fa-solid fa-circle-info text-primary me-1"></i> Supports <strong>CSV</strong> and <strong>Excel (.xlsx)</strong> files. Dashboard graphs, counts, and analytics refresh instantly.
                 </div>
             </div>
             <div class="col-lg-4 col-md-5">
@@ -658,8 +658,8 @@
                     <div class="mb-3 text-center p-4 border border-2 border-dashed rounded-3 bg-body-tertiary">
                         <i class="fa-solid fa-file-excel fs-1 text-success mb-2"></i>
                         <h6 class="fw-bold mb-1">Select or Drag Dataset File</h6>
-                        <p class="text-muted small mb-3">Upload your Excel (.xlsx, .xls) or CSV (.csv) student data</p>
-                        <input type="file" name="dataset" class="form-control" accept=".csv, .xlsx, .xls" required>
+                        <p class="text-muted small mb-3">Upload your Excel (.xlsx) or CSV (.csv) student data</p>
+                        <input type="file" name="dataset" class="form-control" accept=".csv,.xlsx" required>
                     </div>
                     <div class="alert alert-info py-2 px-3 small d-flex align-items-center gap-2 mb-0 rounded-3">
                         <i class="fa-solid fa-lightbulb text-info fs-5"></i>

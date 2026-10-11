@@ -2,17 +2,92 @@ name: CI
 
 on:
   push:
-    branches: [main, master, "fix/**"]
+    branches: [main, master, "fix/**", "redesign/**"]
   pull_request:
 
 jobs:
-  syntax:
+  validation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
-      - run: python -m compileall app.py prediction
+
+      - name: Python syntax check
+        run: python -m compileall app.py prediction
+
+      - name: Jinja template syntax check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from jinja2 import Environment
+
+          env = Environment()
+          templates = sorted(Path('templates').glob('*.html'))
+          for path in templates:
+              env.parse(path.read_text(encoding='utf-8'))
+              print('OK', path)
+          print(f'Validated {len(templates)} templates')
+          PY
+
+      - name: JavaScript syntax check
+        run: |
+          for file in static/js/*.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+
+      - name: Flask route and auth-page smoke test
+        env:
+          SECRET_KEY: ci-test-secret-key
+        run: |
+          python - <<'PY'
+          import app as project
+
+          required_endpoints = {
+              'dashboard', 'dataset_preview', 'upload_dataset', 'eda',
+              'preprocessing', 'download_preprocessed', 'train',
+              'prediction', 'predict', 'history', 'report',
+              'download_saved_report', 'download_report', 'export_csv',
+              'export_excel', 'login', 'register', 'logout'
+          }
+          endpoints = {rule.endpoint for rule in project.app.url_map.iter_rules()}
+          missing = sorted(required_endpoints - endpoints)
+          assert not missing, f'Missing Flask endpoints: {missing}'
+
+          client = project.app.test_client()
+          assert client.get('/login').status_code == 200
+          assert client.get('/register').status_code == 200
+          assert client.get('/').status_code in (301, 302)
+          print('Flask route and auth-page smoke tests passed')
+          PY
+
+      - name: Legacy branding check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          legacy_terms = ['Placement' + 'AI', 'Placement Prediction' + ' System']
+          allowed_extensions = {'.html', '.md', '.py', '.js', '.css', '.txt'}
+          hits = []
+
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts or path.suffix.lower() not in allowed_extensions:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              for term in legacy_terms:
+                  if term in text:
+                      hits.append(f'{path}: {term}')
+
+          if hits:
+              raise SystemExit('Legacy branding found:\n' + '\n'.join(hits))
+          print('Branding check passed')
+          PY
