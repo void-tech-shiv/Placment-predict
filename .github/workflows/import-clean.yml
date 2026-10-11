@@ -1,46 +1,10 @@
-name: Import clean project snapshot
+name: Clean snapshot importer (disabled)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/import-clean.yml'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  import:
+  disabled:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout fresh repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download current fixed project snapshot
-        run: |
-          rm -rf /tmp/placement-source
-          git clone --depth 1 --branch master https://github.com/void-tech-shiv/placement.git /tmp/placement-source
-
-      - name: Replace working tree without source Git history
-        run: |
-          cp .github/workflows/import-clean.yml /tmp/import-clean.yml
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          rsync -a --exclude='.git' --exclude='.github/workflows/ci.yml' /tmp/placement-source/ ./
-          mkdir -p .github/workflows
-          cp /tmp/import-clean.yml .github/workflows/import-clean.yml
-          rm -f .fresh-repo
-
-      - name: Commit clean snapshot as Shivanshu
-        run: |
-          git config user.name "SHIVANSHU SATYAJEET"
-          git config user.email "satyajeetshivanshu@gmail.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to import."
-            exit 0
-          fi
-          git commit -m "feat: import clean Placement Prediction System snapshot"
-          git push origin main
+      - run: echo "Clean snapshot import already completed."
