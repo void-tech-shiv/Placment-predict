@@ -26,8 +26,11 @@ jobs:
 
       - name: Replace working tree without source Git history
         run: |
+          cp .github/workflows/import-clean.yml /tmp/import-clean.yml
           find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-          rsync -a --exclude='.git' /tmp/placement-source/ ./
+          rsync -a --exclude='.git' --exclude='.github/workflows/ci.yml' /tmp/placement-source/ ./
+          mkdir -p .github/workflows
+          cp /tmp/import-clean.yml .github/workflows/import-clean.yml
           rm -f .fresh-repo
 
       - name: Commit clean snapshot as Shivanshu
