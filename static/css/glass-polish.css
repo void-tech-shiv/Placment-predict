@@ -1,0 +1,263 @@
+/* Placement Predict glassmorphism polish layer.
+   Loaded last so it only refines presentation and does not alter functional hooks. */
+
+:root {
+  --pp-glass-border-strong: rgba(255, 255, 255, .16);
+  --pp-glass-highlight: rgba(255, 255, 255, .08);
+  --pp-glass-shadow: 0 22px 55px rgba(6, 10, 30, .28);
+}
+
+[data-theme="light"] {
+  --pp-glass-border-strong: rgba(255, 255, 255, .76);
+  --pp-glass-highlight: rgba(255, 255, 255, .58);
+  --pp-glass-shadow: 0 20px 48px rgba(67, 71, 125, .14);
+}
+
+/* Tone down the large highlight that was washing out the hero actions. */
+.dashboard-hero-banner {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(103, 91, 255, .11), rgba(36, 199, 255, .055) 52%, rgba(95, 234, 212, .035)),
+    rgba(16, 24, 52, .42) !important;
+  border: 1px solid rgba(171, 183, 255, .18) !important;
+  box-shadow: inset 0 1px 0 var(--pp-glass-highlight), 0 18px 44px rgba(2, 8, 28, .18) !important;
+}
+
+.dashboard-hero-banner::after {
+  content: "";
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  right: -185px;
+  top: -205px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(94, 234, 212, .11), rgba(76, 117, 255, .055) 42%, transparent 72%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.dashboard-hero-banner > * { position: relative; z-index: 1; }
+
+/* Make the three hero actions feel like one intentional control group. */
+.dashboard-hero-banner .btn {
+  min-height: 46px;
+  border-radius: 15px !important;
+  border: 1px solid rgba(255, 255, 255, .13) !important;
+  background: rgba(255, 255, 255, .075) !important;
+  color: var(--text-main) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 8px 22px rgba(4, 8, 24, .16) !important;
+  backdrop-filter: blur(16px) saturate(135%);
+}
+
+.dashboard-hero-banner .btn:hover {
+  border-color: rgba(145, 126, 255, .48) !important;
+  background: rgba(120, 104, 255, .14) !important;
+  transform: translateY(-1px);
+}
+
+.dashboard-hero-banner .btn-primary,
+.dashboard-hero-banner .btn-glow {
+  background: linear-gradient(135deg, rgba(111, 92, 255, .92), rgba(145, 108, 255, .82)) !important;
+  color: #fff !important;
+  border-color: rgba(190, 180, 255, .42) !important;
+  box-shadow: 0 10px 28px rgba(96, 76, 255, .24) !important;
+}
+
+/* Compact the dashboard upload card and clean up the file picker row. */
+.dashboard-hero-banner + .card-custom {
+  margin-bottom: 1.15rem !important;
+}
+
+.dashboard-hero-banner + .card-custom .card-header-custom {
+  padding-bottom: .72rem !important;
+  margin-bottom: .75rem !important;
+}
+
+.dashboard-hero-banner + .card-custom > .p-3,
+.dashboard-hero-banner + .card-custom > .p-md-4 {
+  padding: .85rem 1rem 1rem !important;
+}
+
+.dashboard-hero-banner + .card-custom .row {
+  --bs-gutter-y: .7rem;
+}
+
+.dashboard-hero-banner + .card-custom .input-group {
+  display: flex;
+  align-items: stretch;
+  min-height: 46px;
+  border: 1px solid rgba(163, 177, 236, .18);
+  border-radius: 15px;
+  overflow: hidden;
+  background: rgba(7, 13, 31, .26);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+}
+
+.dashboard-hero-banner + .card-custom .input-group-text {
+  width: 48px;
+  display: grid;
+  place-items: center;
+  border: 0 !important;
+  border-right: 1px solid rgba(163, 177, 236, .14) !important;
+  border-radius: 0 !important;
+  background: rgba(255, 255, 255, .055) !important;
+}
+
+.dashboard-hero-banner + .card-custom input[type="file"] {
+  min-height: 44px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.dashboard-hero-banner + .card-custom input[type="file"]::file-selector-button {
+  height: 34px;
+  margin: 4px 10px 4px 0;
+  border: 1px solid rgba(183, 190, 255, .18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .09);
+  color: var(--text-main);
+  padding: 0 .85rem;
+  cursor: pointer;
+}
+
+.dashboard-hero-banner + .card-custom .btn-primary-custom {
+  min-height: 46px;
+  border-radius: 15px !important;
+}
+
+.dashboard-hero-banner + .card-custom .form-text {
+  margin-top: .45rem !important;
+}
+
+/* Keep KPI styling consistent — no single hovered card stripe. */
+.kpi-card.glass-card::before,
+.kpi-card.glass-card:hover::before {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+.kpi-card.glass-card {
+  min-height: 104px !important;
+  border: 1px solid rgba(166, 179, 238, .16) !important;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .035)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .065), 0 12px 34px rgba(4, 8, 24, .14) !important;
+}
+
+.kpi-card.glass-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(152, 132, 255, .34) !important;
+}
+
+/* Improve glass depth across the main surfaces without making them opaque. */
+.card-custom,
+.pp-panel,
+.glass-card,
+.preprocessing-banner,
+.stat-card,
+.encoding-card,
+.modal-content {
+  background: linear-gradient(145deg, rgba(255, 255, 255, .075), rgba(255, 255, 255, .035)) !important;
+  border-color: rgba(166, 179, 238, .15) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .055), 0 16px 38px rgba(3, 8, 24, .15) !important;
+  backdrop-filter: blur(24px) saturate(138%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(138%) !important;
+}
+
+.pp-sidebar {
+  background: linear-gradient(180deg, rgba(11, 18, 45, .72), rgba(7, 14, 35, .58)) !important;
+  border: 1px solid rgba(155, 169, 233, .16) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045), 0 22px 58px rgba(1, 5, 20, .22) !important;
+  backdrop-filter: blur(28px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(135%) !important;
+}
+
+.pp-header {
+  background: linear-gradient(135deg, rgba(12, 19, 48, .66), rgba(9, 18, 44, .48)) !important;
+  border-color: rgba(158, 172, 236, .15) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045), 0 12px 30px rgba(1, 5, 20, .13) !important;
+}
+
+/* Improve secondary tab legibility. */
+.nav-pills .nav-link,
+.nav-tabs .nav-link {
+  color: rgba(225, 231, 255, .76) !important;
+  background: rgba(255, 255, 255, .055) !important;
+  border-color: rgba(172, 182, 238, .13) !important;
+}
+
+.nav-pills .nav-link:hover,
+.nav-tabs .nav-link:hover {
+  color: #fff !important;
+  background: rgba(131, 113, 255, .13) !important;
+  border-color: rgba(157, 139, 255, .28) !important;
+}
+
+.nav-pills .nav-link.active,
+.nav-tabs .nav-link.active {
+  color: #fff !important;
+  background: linear-gradient(135deg, rgba(99, 85, 255, .78), rgba(119, 95, 255, .58)) !important;
+  border-color: rgba(178, 166, 255, .32) !important;
+  box-shadow: 0 7px 18px rgba(75, 61, 220, .18) !important;
+}
+
+/* Make muted copy easier to read in dark glass surfaces. */
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .form-text,
+[data-theme="dark"] .kpi-subtext,
+[data-theme="dark"] .pp-page-intro p {
+  color: rgba(215, 223, 248, .68) !important;
+}
+
+/* Keep tables distinctly glassy instead of flat dark boxes. */
+.table-responsive,
+.table-custom-container {
+  background: rgba(6, 12, 30, .20) !important;
+  border-color: rgba(163, 177, 236, .14) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035) !important;
+}
+
+.table thead th,
+.table-custom th {
+  background: rgba(255, 255, 255, .055) !important;
+}
+
+/* Light mode equivalents. */
+[data-theme="light"] .dashboard-hero-banner,
+[data-theme="light"] .card-custom,
+[data-theme="light"] .pp-panel,
+[data-theme="light"] .glass-card,
+[data-theme="light"] .preprocessing-banner,
+[data-theme="light"] .stat-card,
+[data-theme="light"] .encoding-card,
+[data-theme="light"] .modal-content {
+  background: linear-gradient(145deg, rgba(255, 255, 255, .72), rgba(255, 255, 255, .42)) !important;
+  border-color: rgba(255, 255, 255, .82) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85), 0 16px 38px rgba(78, 88, 142, .10) !important;
+}
+
+[data-theme="light"] .pp-sidebar {
+  background: linear-gradient(180deg, rgba(34, 43, 83, .90), rgba(28, 37, 75, .82)) !important;
+}
+
+[data-theme="light"] .pp-header {
+  background: linear-gradient(135deg, rgba(255, 255, 255, .74), rgba(244, 247, 255, .55)) !important;
+}
+
+[data-theme="light"] .nav-pills .nav-link,
+[data-theme="light"] .nav-tabs .nav-link {
+  color: #53607d !important;
+  background: rgba(255, 255, 255, .58) !important;
+}
+
+@media (max-width: 991px) {
+  .dashboard-hero-banner .d-flex.gap-2 {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .dashboard-hero-banner .d-flex.gap-2 .btn {
+    flex: 1 1 180px;
+    justify-content: center;
+  }
+}
