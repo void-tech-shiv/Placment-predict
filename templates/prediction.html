@@ -1,7 +1,97 @@
 {% extends "base.html" %}
-{% block title %}Predict Placement - PlacementAI{% endblock %}
-{% block page_header %}<i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i> Predict Placement{% endblock %}
+{% block title %}Placement Predictor - Placement Predict{% endblock %}
+{% block page_header %}<i class="fa-solid fa-bolt text-primary me-2"></i> Placement Predictor{% endblock %}
 {% block content %}
-<div class="row g-4"><div class="col-xl-7"><div class="card-custom"><div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-user-graduate text-primary"></i> Student Details</h5></div>{% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}{% if feature_columns %}<form action="{{ url_for('predict') }}" method="POST" id="predictionForm"><div class="row g-3">{% for column in feature_columns %}{% set schema=feature_schema.get(column,{}) %}<div class="col-md-6"><label class="form-label-custom">{{ column.replace('_',' ') }}</label>{% if schema.get('type') == 'categorical' %}<select class="form-control-custom" name="{{ column }}" required><option value="" disabled selected>Select value</option>{% for value in schema.get('choices',[]) %}<option value="{{ value }}">{{ value }}</option>{% endfor %}</select>{% else %}<input type="number" step="any" class="form-control-custom" name="{{ column }}" value="{{ student_input.get(column,'') if student_input else '' }}" required>{% endif %}</div>{% endfor %}</div><button type="submit" class="btn-primary-custom mt-4" id="predictBtn"><i class="fa-solid fa-wand-magic-sparkles"></i> Predict Placement</button></form>{% endif %}</div></div><div class="col-xl-5"><div class="card-custom h-100"><div class="card-header-custom"><h5 class="card-title-custom"><i class="fa-solid fa-chart-simple text-success"></i> Prediction Result</h5></div>{% if prediction %}{% set placed=prediction == 'Placed' %}<div class="text-center py-4"><div class="display-6 fw-bold {{ 'text-success' if placed else 'text-danger' }}">{{ prediction }}</div>{% if confidence is not none %}<div class="d-flex justify-content-between small mt-4 mb-1"><span>Confidence</span><strong>{{ confidence }}%</strong></div><div class="progress" style="height:12px"><div class="progress-bar {{ 'bg-success' if placed else 'bg-danger' }}" style="width:{{ confidence }}%"></div></div>{% endif %}<a href="{{ url_for('download_report') }}" class="btn btn-outline-danger mt-4"><i class="fa-solid fa-file-pdf me-1"></i> Download PDF</a></div>{% else %}<div class="text-center text-muted py-5">Submit a student profile to see the result here.</div>{% endif %}</div></div></div>
+<div class="pp-page-intro">
+  <div>
+    <h2>Predict a student's placement outcome</h2>
+    <p>Enter the student profile below. The trained model will return a placement decision and confidence score when available.</p>
+  </div>
+  <span class="pp-chip"><i class="fa-solid fa-microchip"></i> ML inference</span>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <section class="pp-panel h-100">
+      <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+        <div>
+          <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Student profile</div>
+          <h5 class="mb-0 fw-bold">Input Features</h5>
+        </div>
+        <div class="pp-chip"><i class="fa-solid fa-list-check"></i> {{ feature_columns|length if feature_columns else 0 }} fields</div>
+      </div>
+
+      {% if error %}<div class="alert alert-warning">{{ error }}</div>{% endif %}
+
+      {% if feature_columns %}
+      <form action="{{ url_for('predict') }}" method="POST" id="predictionForm">
+        <div class="row g-3">
+          {% for column in feature_columns %}
+          {% set schema=feature_schema.get(column,{}) %}
+          <div class="col-md-6">
+            <label class="form-label-custom">{{ column.replace('_',' ') }}</label>
+            {% if schema.get('type') == 'categorical' %}
+            <select class="form-control-custom" name="{{ column }}" required>
+              <option value="" disabled selected>Select value</option>
+              {% for value in schema.get('choices',[]) %}<option value="{{ value }}">{{ value }}</option>{% endfor %}
+            </select>
+            {% else %}
+            <input type="number" step="any" class="form-control-custom" name="{{ column }}" value="{{ student_input.get(column,'') if student_input else '' }}" required>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn-primary-custom mt-4" id="predictBtn">
+          <i class="fa-solid fa-bolt"></i> Run Placement Prediction
+        </button>
+      </form>
+      {% else %}
+      <div class="pp-result-placeholder">
+        <div><i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i><div>No model input schema is available yet.</div></div>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+
+  <div class="col-xl-5">
+    <section class="pp-panel h-100">
+      <div class="text-uppercase text-muted fw-bold fs-7 mb-1">Prediction output</div>
+      <h5 class="fw-bold mb-4">Result</h5>
+
+      {% if prediction %}
+      {% set placed=prediction == 'Placed' %}
+      <div class="text-center py-3">
+        <div class="pp-result-orb {{ 'success' if placed else 'danger' }}">
+          <i class="fa-solid {{ 'fa-circle-check' if placed else 'fa-circle-xmark' }}"></i>
+        </div>
+        <div class="text-uppercase text-muted fw-bold fs-7">Predicted outcome</div>
+        <div class="display-6 fw-bold mt-1 {{ 'text-success' if placed else 'text-danger' }}">{{ prediction }}</div>
+
+        {% if confidence is not none %}
+        <div class="pp-metric-tile text-start mt-4">
+          <span>Confidence score</span>
+          <div class="d-flex align-items-center justify-content-between gap-3 mt-2">
+            <div class="progress flex-grow-1" style="height:10px"><div class="progress-bar" style="width:{{ confidence }}%"></div></div>
+            <strong class="mt-0">{{ confidence }}%</strong>
+          </div>
+        </div>
+        {% endif %}
+
+        <a href="{{ url_for('download_report') }}" class="btn-outline-custom mt-4 justify-content-center">
+          <i class="fa-solid fa-file-arrow-down"></i> Download Prediction PDF
+        </a>
+      </div>
+      {% else %}
+      <div class="pp-result-placeholder">
+        <div>
+          <div class="pp-result-orb"><i class="fa-solid fa-chart-simple"></i></div>
+          <strong class="d-block text-main mb-1">Waiting for a student profile</strong>
+          <span class="small">Complete the form and run a prediction to see the result here.</span>
+        </div>
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
 {% endblock %}
 {% block extra_scripts %}<script src="{{ url_for('static', filename='js/prediction.js') }}"></script>{% endblock %}
