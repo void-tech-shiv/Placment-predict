@@ -16,6 +16,7 @@
     {% block extra_head %}{% endblock %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/placement-predict.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth-glass.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/glass-polish.css') }}">
     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 </head>
 {% set auth_page = request.endpoint in ['login', 'register'] %}
