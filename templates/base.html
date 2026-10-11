@@ -53,6 +53,7 @@
       <div class="nav-heading">Records</div>
       <a href="{{ url_for('history') }}" class="{% if request.endpoint == 'history' %}active{% endif %}"><i class="fa-solid fa-clock-rotate-left"></i><span>Prediction History</span></a>
       <a href="{{ url_for('report') }}" class="{% if request.endpoint in ['report','download_saved_report'] %}active{% endif %}"><i class="fa-solid fa-file-pdf"></i><span>Reports</span></a>
+      {% if session.get('user', {}).get('role') == 'Admin' %}<div class="nav-heading">Administration</div><a href="{{ url_for('admin_console') }}" class="{% if request.endpoint and request.endpoint.startswith('admin_') %}active{% endif %}"><i class="fa-solid fa-shield-halved"></i><span>Admin Console</span></a>{% endif %}
     </nav>
     <div class="sidebar-footer pp-sidebar-footer"><div class="pp-system-status"><span class="pp-status-dot"></span><span>System online</span></div><small>Placement Predict · v2.0 Glass</small></div>
   </aside>
