@@ -1,28 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Sign In - Placement Predict{% endblock %}
-{% block page_header %}<i class="fa-solid fa-shield-halved text-primary me-2"></i> Secure Sign In{% endblock %}
 {% block content %}
-<div class="auth-shell">
-  <section class="auth-aside">
-    <div>
-      <div class="auth-kicker">Placement Predict</div>
-      <h2>Turn student data into placement insights.</h2>
-      <p>Explore datasets, compare machine-learning models, run predictions, and generate reports from one dashboard.</p>
-      <div class="auth-points">
-        <div class="auth-point"><i class="fa-solid fa-chart-line"></i><span>Live placement analytics</span></div>
-        <div class="auth-point"><i class="fa-solid fa-brain"></i><span>Multi-model training and comparison</span></div>
-        <div class="auth-point"><i class="fa-solid fa-file-pdf"></i><span>Prediction history and PDF reports</span></div>
-      </div>
-    </div>
-    <small>Machine Learning · Flask · Scikit-learn</small>
-  </section>
-
+<div class="auth-shell auth-single">
   <section class="auth-card">
     <div class="auth-icon"><i class="fa-solid fa-arrow-right-to-bracket"></i></div>
+    <div class="auth-kicker auth-kicker-dark">PLACEMENT PREDICT</div>
     <h3>Welcome back</h3>
-    <p class="text-muted small mb-4">Use your registered account to access Placement Predict.</p>
+    <p class="text-muted small mb-4">Sign in to open your placement intelligence workspace.</p>
 
     <form action="{{ url_for('login') }}" method="POST" id="loginForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-3">
         <label class="form-label-custom" for="loginEmail">Email address</label>
         <input id="loginEmail" type="email" name="email" class="form-control-custom" autocomplete="email" placeholder="name@example.com" required autofocus>
@@ -31,31 +18,19 @@
         <label class="form-label-custom" for="passwordInput">Password</label>
         <div class="input-group">
           <input type="password" id="passwordInput" name="password" class="form-control-custom" autocomplete="current-password" placeholder="Enter your password" required>
-          <button type="button" class="btn btn-outline-secondary" id="togglePasswordBtn" aria-label="Show password">
-            <i class="fa-solid fa-eye" id="toggleIcon"></i>
-          </button>
+          <button type="button" class="btn btn-outline-secondary" id="togglePasswordBtn" aria-label="Show password"><i class="fa-solid fa-eye" id="toggleIcon"></i></button>
         </div>
       </div>
-      <button type="submit" class="btn-primary-custom w-100 justify-content-center py-2.5">
-        <i class="fa-solid fa-arrow-right"></i> Continue to Dashboard
-      </button>
+      <button type="submit" class="btn-primary-custom w-100 justify-content-center py-2.5"><i class="fa-solid fa-arrow-right"></i> Sign In</button>
     </form>
 
-    <div class="auth-switch">
-      <span class="text-muted small">New to Placement Predict? </span>
-      <a href="{{ url_for('register') }}" class="fw-bold text-decoration-none text-primary">Create an account</a>
-    </div>
+    <div class="auth-switch"><span class="text-muted small">Don't have an account? </span><a href="{{ url_for('register') }}" class="fw-bold text-decoration-none text-primary">Create account</a></div>
+    <div class="auth-mini-note"><i class="fa-solid fa-shield-halved"></i> Secure session · CSRF protected</div>
   </section>
 </div>
 {% endblock %}
 {% block extra_scripts %}
 <script>
-document.getElementById('togglePasswordBtn')?.addEventListener('click',()=>{
-  const input=document.getElementById('passwordInput');
-  const icon=document.getElementById('toggleIcon');
-  const show=input.type==='password';
-  input.type=show?'text':'password';
-  icon.className=show?'fa-solid fa-eye-slash':'fa-solid fa-eye';
-});
+document.getElementById('togglePasswordBtn')?.addEventListener('click',()=>{const input=document.getElementById('passwordInput');const icon=document.getElementById('toggleIcon');const show=input.type==='password';input.type=show?'text':'password';icon.className=show?'fa-solid fa-eye-slash':'fa-solid fa-eye';});
 </script>
 {% endblock %}
