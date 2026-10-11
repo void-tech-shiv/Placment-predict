@@ -1,0 +1,46 @@
+name: One-time brand cleanup
+
+on:
+  push:
+    branches: ["redesign/placement-predict-ui"]
+    paths:
+      - ".github/workflows/brand-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: redesign/placement-predict-ui
+      - name: Replace legacy project branding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          replacements = {
+              'PlacementAI': 'Placement Predict',
+              'Placement Prediction System': 'Placement Predict',
+          }
+          for path in Path('templates').glob('*.html'):
+              text = path.read_text(encoding='utf-8')
+              updated = text
+              for old, new in replacements.items():
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+                  print('updated', path)
+          PY
+      - name: Commit source-level branding cleanup
+        run: |
+          git config user.name "SHIVANSHU SATYAJEET"
+          git config user.email "satyajeetshivanshu@gmail.com"
+          git add templates
+          if git diff --cached --quiet; then
+            echo "No legacy branding found."
+            exit 0
+          fi
+          git commit -m "refactor: rename project branding to Placement Predict"
+          git push origin HEAD:redesign/placement-predict-ui
