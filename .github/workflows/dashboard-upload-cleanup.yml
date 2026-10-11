@@ -1,0 +1,39 @@
+name: One-time dashboard upload cleanup
+
+on:
+  push:
+    branches: ["redesign/placement-predict-ui"]
+    paths:
+      - ".github/workflows/dashboard-upload-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: redesign/placement-predict-ui
+      - name: Align dashboard upload UI with backend file support
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('templates/dashboard.html')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('accept=".csv, .xlsx, .xls"', 'accept=".csv,.xlsx"')
+          text = text.replace('Excel (.xlsx, .xls)', 'Excel (.xlsx)')
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit dashboard upload fix
+        run: |
+          git config user.name "SHIVANSHU SATYAJEET"
+          git config user.email "satyajeetshivanshu@gmail.com"
+          git add templates/dashboard.html
+          if git diff --cached --quiet; then
+            echo "No dashboard upload cleanup needed."
+            exit 0
+          fi
+          git commit -m "fix: align dashboard upload file types"
+          git push origin HEAD:redesign/placement-predict-ui
