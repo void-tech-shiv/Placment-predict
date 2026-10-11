@@ -69,8 +69,25 @@ jobs:
 
       - name: Legacy branding check
         run: |
-          if grep -R -n -E "PlacementAI|Placement Prediction System" templates README.md; then
-            echo "Legacy branding found"
-            exit 1
-          fi
-          echo "Branding check passed"
+          python - <<'PY'
+          from pathlib import Path
+
+          legacy_terms = ['Placement' + 'AI', 'Placement Prediction' + ' System']
+          allowed_extensions = {'.html', '.md', '.py', '.js', '.css', '.txt'}
+          hits = []
+
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts or path.suffix.lower() not in allowed_extensions:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              for term in legacy_terms:
+                  if term in text:
+                      hits.append(f'{path}: {term}')
+
+          if hits:
+              raise SystemExit('Legacy branding found:\n' + '\n'.join(hits))
+          print('Branding check passed')
+          PY
