@@ -1,0 +1,266 @@
+name: Apply Neon Admin Migration
+on:
+  push:
+    branches: [feat/neon-admin-console]
+    paths: ['.github/workflows/apply-neon-admin.yml']
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/neon-admin-console
+      - name: Patch application
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          db_store = r'''import os
+from contextlib import contextmanager
+from datetime import date
+
+import psycopg
+from psycopg.rows import dict_row
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+
+
+def db_enabled():
+    return bool(DATABASE_URL)
+
+
+@contextmanager
+def connection():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is not configured")
+    with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
+        yield conn
+
+
+def ensure_admin(email, password_hash, name):
+    if not db_enabled() or not email or not password_hash:
+        return
+    with connection() as conn:
+        conn.execute(
+            """INSERT INTO users (name,email,password_hash,role,is_active)
+               VALUES (%s,%s,%s,'Admin',TRUE)
+               ON CONFLICT (email) DO NOTHING""",
+            (name, email.lower(), password_hash),
+        )
+
+
+def fetch_users():
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT id,name,email,password_hash,role,is_active,created_at,last_login_at FROM users ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r, password=r["password_hash"]) for r in rows]
+
+
+def create_user(name, email, password_hash, role="Student"):
+    with connection() as conn:
+        row = conn.execute(
+            """INSERT INTO users (name,email,password_hash,role,is_active)
+               VALUES (%s,%s,%s,%s,TRUE)
+               RETURNING id,name,email,role,is_active,created_at,last_login_at""",
+            (name, email.lower(), password_hash, role),
+        ).fetchone()
+    return dict(row)
+
+
+def touch_login(email):
+    with connection() as conn:
+        conn.execute("UPDATE users SET last_login_at=NOW() WHERE email=%s", (email.lower(),))
+
+
+def set_user_active(user_id, active):
+    with connection() as conn:
+        conn.execute("UPDATE users SET is_active=%s WHERE id=%s", (bool(active), int(user_id)))
+
+
+def set_user_role(user_id, role):
+    if role not in {"Admin", "Student"}:
+        raise ValueError("Invalid role")
+    with connection() as conn:
+        conn.execute("UPDATE users SET role=%s WHERE id=%s", (role, int(user_id)))
+
+
+def save_history(student_data, prediction, prediction_label, confidence, report_name, user_email):
+    with connection() as conn:
+        row = conn.execute(
+            """INSERT INTO prediction_history
+               (student_name,student_data,prediction,prediction_label,confidence,report_name,user_email)
+               VALUES (%s,%s::jsonb,%s,%s,%s,%s,%s) RETURNING id""",
+            (
+                student_data.get("Name") or student_data.get("Student_Name") or "Student",
+                psycopg.types.json.Jsonb(student_data), prediction, prediction_label,
+                confidence, report_name, user_email or None,
+            ),
+        ).fetchone()
+    return row["id"]
+
+
+def fetch_history(email=None, is_admin=False):
+    with connection() as conn:
+        if is_admin:
+            rows = conn.execute(
+                """SELECT id,created_at,student_name,student_data,prediction,prediction_label,
+                          confidence,report_name,user_email
+                   FROM prediction_history ORDER BY created_at ASC"""
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT id,created_at,student_name,student_data,prediction,prediction_label,
+                          confidence,report_name,user_email
+                   FROM prediction_history WHERE user_email=%s ORDER BY created_at ASC""",
+                (email or "",),
+            ).fetchall()
+    return [{
+        "id": r["id"], "date": r["created_at"].isoformat(timespec="seconds"),
+        "student_name": r["student_name"], "student": r["student_data"] or {},
+        "prediction": r["prediction"], "prediction_label": r["prediction_label"],
+        "confidence": r["confidence"], "report": r["report_name"],
+        "user_email": r["user_email"] or "",
+    } for r in rows]
+
+
+def increment_metric(metric):
+    allowed = {"predictions", "registrations", "logins"}
+    if metric not in allowed:
+        return
+    with connection() as conn:
+        conn.execute(
+            f"""INSERT INTO traffic_daily (traffic_date,{metric}) VALUES (CURRENT_DATE,1)
+                ON CONFLICT (traffic_date) DO UPDATE SET {metric}=traffic_daily.{metric}+1, updated_at=NOW()"""
+        )
+
+
+def record_request(path, visitor_hash, authenticated=False):
+    clean_path = (path or "/")[:255]
+    with connection() as conn:
+        is_new = conn.execute(
+            """INSERT INTO visitor_daily (traffic_date,visitor_hash) VALUES (CURRENT_DATE,%s)
+               ON CONFLICT DO NOTHING RETURNING visitor_hash""", (visitor_hash,)
+        ).fetchone() is not None
+        conn.execute(
+            """INSERT INTO traffic_daily (traffic_date,requests,unique_visitors,authenticated_requests)
+               VALUES (CURRENT_DATE,1,%s,%s)
+               ON CONFLICT (traffic_date) DO UPDATE SET
+                 requests=traffic_daily.requests+1,
+                 unique_visitors=traffic_daily.unique_visitors+EXCLUDED.unique_visitors,
+                 authenticated_requests=traffic_daily.authenticated_requests+EXCLUDED.authenticated_requests,
+                 updated_at=NOW()""",
+            (1 if is_new else 0, 1 if authenticated else 0),
+        )
+        conn.execute(
+            """INSERT INTO page_traffic (traffic_date,path,requests) VALUES (CURRENT_DATE,%s,1)
+               ON CONFLICT (traffic_date,path) DO UPDATE SET requests=page_traffic.requests+1""",
+            (clean_path,),
+        )
+
+
+def admin_snapshot(days=14):
+    with connection() as conn:
+        totals = conn.execute(
+            """SELECT
+               (SELECT COUNT(*) FROM users) AS total_users,
+               (SELECT COUNT(*) FROM users WHERE is_active) AS active_users,
+               (SELECT COUNT(*) FROM users WHERE role='Admin') AS admins,
+               (SELECT COUNT(*) FROM prediction_history) AS total_predictions"""
+        ).fetchone()
+        today = conn.execute(
+            """SELECT requests,unique_visitors,authenticated_requests,predictions,registrations,logins
+               FROM traffic_daily WHERE traffic_date=CURRENT_DATE"""
+        ).fetchone() or {"requests":0,"unique_visitors":0,"authenticated_requests":0,"predictions":0,"registrations":0,"logins":0}
+        daily = conn.execute(
+            """SELECT traffic_date,requests,unique_visitors,predictions,registrations,logins
+               FROM traffic_daily WHERE traffic_date >= CURRENT_DATE - (%s::int - 1)
+               ORDER BY traffic_date""", (days,)
+        ).fetchall()
+        top_pages = conn.execute(
+            """SELECT path,SUM(requests)::bigint AS requests FROM page_traffic
+               WHERE traffic_date >= CURRENT_DATE - 6 GROUP BY path ORDER BY requests DESC LIMIT 8"""
+        ).fetchall()
+    return {"totals": dict(totals), "today": dict(today), "daily": [dict(r) for r in daily], "top_pages": [dict(r) for r in top_pages]}
+'''
+          Path('db_store.py').write_text(db_store, encoding='utf-8')
+
+          admin_html = r'''{% extends "base.html" %}
+{% block title %}Admin Console - Placement Predict{% endblock %}
+{% block page_header %}Admin Console{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="admin-hero glass-panel mb-4"><div><div class="pp-eyebrow">SYSTEM CONTROL</div><h1>Admin Console</h1><p>Manage accounts, monitor daily usage, and review platform activity from one place.</p></div><div class="admin-live"><span></span> Neon connected</div></div>
+<div class="admin-kpis mb-4">
+  <div class="admin-kpi glass-panel"><small>Total Users</small><strong>{{ stats.totals.total_users }}</strong><span>{{ stats.totals.active_users }} active</span></div>
+  <div class="admin-kpi glass-panel"><small>Today's Visitors</small><strong>{{ stats.today.unique_visitors }}</strong><span>{{ stats.today.requests }} requests</span></div>
+  <div class="admin-kpi glass-panel"><small>Total Predictions</small><strong>{{ stats.totals.total_predictions }}</strong><span>{{ stats.today.predictions }} today</span></div>
+  <div class="admin-kpi glass-panel"><small>Today's Auth</small><strong>{{ stats.today.logins }}</strong><span>{{ stats.today.registrations }} registrations</span></div>
+</div>
+<div class="row g-4 mb-4"><div class="col-xl-8"><div class="glass-panel admin-card"><div class="admin-card-head"><div><small>LAST 14 DAYS</small><h3>Traffic & visitors</h3></div></div><canvas id="trafficChart" height="105"></canvas></div></div><div class="col-xl-4"><div class="glass-panel admin-card"><div class="admin-card-head"><div><small>LAST 7 DAYS</small><h3>Top pages</h3></div></div><div class="admin-pages">{% for page in stats.top_pages %}<div><span>{{ page.path }}</span><strong>{{ page.requests }}</strong></div>{% else %}<p class="text-muted">No traffic yet.</p>{% endfor %}</div></div></div></div>
+<div class="glass-panel admin-card"><div class="admin-card-head"><div><small>ACCESS CONTROL</small><h3>User management</h3></div><span class="admin-pill">{{ users|length }} accounts</span></div><div class="table-responsive"><table class="table admin-table align-middle"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Created</th><th>Last login</th><th class="text-end">Controls</th></tr></thead><tbody>{% for u in users %}<tr><td><strong>{{ u.name }}</strong><small>{{ u.email }}</small></td><td><span class="admin-pill">{{ u.role }}</span></td><td><span class="status-dot {{ 'active' if u.is_active else 'off' }}">{{ 'Active' if u.is_active else 'Disabled' }}</span></td><td>{{ u.created_at.strftime('%d %b %Y') if u.created_at else '-' }}</td><td>{{ u.last_login_at.strftime('%d %b, %H:%M') if u.last_login_at else 'Never' }}</td><td class="text-end"><div class="admin-actions"><form method="POST" action="{{ url_for('admin_toggle_user', user_id=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-light" {% if u.email == session.get('user',{}).get('email') %}disabled{% endif %}>{{ 'Disable' if u.is_active else 'Enable' }}</button></form><form method="POST" action="{{ url_for('admin_change_role', user_id=u.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="role" value="{{ 'Student' if u.role == 'Admin' else 'Admin' }}"><button class="btn btn-sm btn-primary" {% if u.email == session.get('user',{}).get('email') %}disabled{% endif %}>Make {{ 'Student' if u.role == 'Admin' else 'Admin' }}</button></form></div></td></tr>{% else %}<tr><td colspan="6" class="text-center text-muted py-5">No users yet.</td></tr>{% endfor %}</tbody></table></div></div>
+<script>document.addEventListener('DOMContentLoaded',()=>{const rows={{ stats.daily|tojson }};new Chart(document.getElementById('trafficChart'),{type:'line',data:{labels:rows.map(r=>r.traffic_date),datasets:[{label:'Requests',data:rows.map(r=>r.requests),tension:.35,fill:true},{label:'Unique visitors',data:rows.map(r=>r.unique_visitors),tension:.35}]},options:{responsive:true,plugins:{legend:{labels:{color:'#aeb8d4'}}},scales:{x:{ticks:{color:'#8f9ab7'},grid:{color:'rgba(255,255,255,.05)'}},y:{beginAtZero:true,ticks:{color:'#8f9ab7'},grid:{color:'rgba(255,255,255,.05)'}}}}});});</script>
+{% endblock %}
+'''
+          Path('templates/admin.html').write_text(admin_html, encoding='utf-8')
+
+          admin_css = r'''.admin-hero{padding:28px 30px;display:flex;justify-content:space-between;gap:20px;align-items:center}.admin-hero h1{font-weight:800;margin:5px 0}.admin-hero p{margin:0;color:var(--text-muted)}.admin-live{padding:9px 14px;border:1px solid rgba(73,220,170,.28);border-radius:999px;background:rgba(73,220,170,.08);font-weight:700}.admin-live span{display:inline-block;width:8px;height:8px;border-radius:50%;background:#49dcaa;margin-right:8px;box-shadow:0 0 14px #49dcaa}.admin-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.admin-kpi{padding:20px}.admin-kpi small{display:block;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.08em}.admin-kpi strong{display:block;font-size:2rem;margin:5px 0}.admin-kpi span{color:var(--text-muted)}.admin-card{padding:24px}.admin-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.admin-card-head small{color:#8f9cff;font-weight:800;letter-spacing:.1em}.admin-card-head h3{margin:3px 0 0;font-weight:800}.admin-pages{display:grid;gap:10px}.admin-pages>div{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.035)}.admin-pages span{overflow:hidden;text-overflow:ellipsis}.admin-pill{display:inline-flex;padding:5px 10px;border-radius:999px;background:rgba(130,118,255,.12);border:1px solid rgba(130,118,255,.25);font-weight:700}.admin-table{--bs-table-bg:transparent;--bs-table-color:inherit}.admin-table td,.admin-table th{border-color:rgba(255,255,255,.08);padding:14px 10px}.admin-table td:first-child small{display:block;color:var(--text-muted);margin-top:3px}.status-dot{display:inline-flex;align-items:center;gap:7px}.status-dot:before{content:'';width:8px;height:8px;border-radius:50%;background:#49dcaa}.status-dot.off:before{background:#ff718b}.admin-actions{display:flex;justify-content:flex-end;gap:8px}.admin-actions form{margin:0}@media(max-width:1100px){.admin-kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.admin-hero{align-items:flex-start;flex-direction:column}.admin-kpis{grid-template-columns:1fr}.admin-actions{flex-direction:column}}
+'''
+          Path('static/css/admin.css').write_text(admin_css, encoding='utf-8')
+
+          app = Path('app.py').read_text(encoding='utf-8')
+          def repl(old,new):
+              global app
+              if old not in app:
+                  raise SystemExit('Patch anchor not found: '+old[:80])
+              app = app.replace(old,new,1)
+
+          repl('import json\n', 'import hashlib\nimport json\n')
+          repl('from werkzeug.security import check_password_hash, generate_password_hash\n', 'from werkzeug.middleware.proxy_fix import ProxyFix\nfrom werkzeug.security import check_password_hash, generate_password_hash\n')
+          repl('from prediction.report_generator import ReportGenerator\n', '''from prediction.report_generator import ReportGenerator\nfrom db_store import (\n    admin_snapshot, create_user as db_create_user, db_enabled, ensure_admin, fetch_history,\n    fetch_users, increment_metric, record_request, save_history, set_user_active,\n    set_user_role, touch_login,\n)\n''')
+          repl('    WTF_CSRF_TIME_LIMIT=None,\n)', '    WTF_CSRF_TIME_LIMIT=None,\n    WTF_CSRF_SSL_STRICT=False,\n)\napp.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)')
+          repl('''def init_runtime_state():\n    if not USERS_FILE.exists():\n        _atomic_json_write(USERS_FILE, [])\n    if not HISTORY_FILE.exists():\n        _atomic_json_write(HISTORY_FILE, [])\n    admin_email = os.environ.get("INITIAL_ADMIN_EMAIL", "").strip().lower()\n    admin_password = os.environ.get("INITIAL_ADMIN_PASSWORD", "")\n    admin_name = os.environ.get("INITIAL_ADMIN_NAME", "Project Admin").strip() or "Project Admin"\n    if admin_email and admin_password:\n        with _json_lock:\n            users = _load_json(USERS_FILE, [])\n            if not any(u.get("email", "").lower() == admin_email for u in users):\n                users.append({"email": admin_email, "name": admin_name, "password": generate_password_hash(admin_password), "role": "Admin"})\n                _atomic_json_write(USERS_FILE, users)\n''', '''def init_runtime_state():\n    if not USERS_FILE.exists():\n        _atomic_json_write(USERS_FILE, [])\n    if not HISTORY_FILE.exists():\n        _atomic_json_write(HISTORY_FILE, [])\n    admin_email = os.environ.get("INITIAL_ADMIN_EMAIL", "").strip().lower()\n    admin_password = os.environ.get("INITIAL_ADMIN_PASSWORD", "")\n    admin_name = os.environ.get("INITIAL_ADMIN_NAME", "Project Admin").strip() or "Project Admin"\n    if db_enabled():\n        if admin_email and admin_password:\n            ensure_admin(admin_email, generate_password_hash(admin_password), admin_name)\n        return\n    if admin_email and admin_password:\n        with _json_lock:\n            users = _load_json(USERS_FILE, [])\n            if not any(u.get("email", "").lower() == admin_email for u in users):\n                users.append({"email": admin_email, "name": admin_name, "password": generate_password_hash(admin_password), "role": "Admin", "is_active": True})\n                _atomic_json_write(USERS_FILE, users)\n''')
+          repl('''def load_users():\n    return _load_json(USERS_FILE, [])\n\n\ndef save_user(user_data):\n    with _json_lock:\n        users = load_users()\n        users.append(user_data)\n        _atomic_json_write(USERS_FILE, users)\n''', '''def load_users():\n    if db_enabled():\n        return fetch_users()\n    return _load_json(USERS_FILE, [])\n\n\ndef save_user(user_data):\n    if db_enabled():\n        return db_create_user(user_data["name"], user_data["email"], user_data["password"], user_data.get("role", "Student"))\n    with _json_lock:\n        users = load_users()\n        user_data.setdefault("is_active", True)\n        users.append(user_data)\n        _atomic_json_write(USERS_FILE, users)\n''')
+          repl('''def load_history():\n    return _load_json(HISTORY_FILE, [])\n''', '''def load_history():\n    if db_enabled():\n        user = session.get("user", {})\n        return fetch_history(user.get("email"), user.get("role") == "Admin")\n    return _load_json(HISTORY_FILE, [])\n''')
+          repl('''    with _json_lock:\n        history = load_history()\n        next_id = max([int(item.get("id", 0)) for item in history] or [0]) + 1\n        history.append({\n            "id": next_id,\n            "date": datetime.now().isoformat(timespec="seconds"),\n            "student_name": student_data.get("Name") or student_data.get("Student_Name") or "Student",\n            "student": student_data,\n            "prediction": prediction,\n            "prediction_label": label,\n            "confidence": confidence,\n            "report": report_name,\n            "user_email": user.get("email", ""),\n        })\n        _atomic_json_write(HISTORY_FILE, history)\n''', '''    if db_enabled():\n        save_history(student_data, prediction, label, confidence, report_name, user.get("email", ""))\n        increment_metric("predictions")\n        return\n    with _json_lock:\n        history = load_history()\n        next_id = max([int(item.get("id", 0)) for item in history] or [0]) + 1\n        history.append({\n            "id": next_id,\n            "date": datetime.now().isoformat(timespec="seconds"),\n            "student_name": student_data.get("Name") or student_data.get("Student_Name") or "Student",\n            "student": student_data,\n            "prediction": prediction,\n            "prediction_label": label,\n            "confidence": confidence,\n            "report": report_name,\n            "user_email": user.get("email", ""),\n        })\n        _atomic_json_write(HISTORY_FILE, history)\n''')
+          repl('''        if not user_match or not verify_user_password(user_match.get("password"), password):\n            flash("Invalid email or password.", "danger")\n            return redirect(url_for("login"))\n''', '''        if not user_match or not verify_user_password(user_match.get("password"), password):\n            flash("Invalid email or password.", "danger")\n            return redirect(url_for("login"))\n        if user_match.get("is_active") is False:\n            flash("This account has been disabled by an administrator.", "danger")\n            return redirect(url_for("login"))\n''')
+          repl('''        session["user"] = {"name": user_match.get("name", "User"), "email": user_match.get("email", email), "role": user_match.get("role", "Student")}\n        flash(f"Welcome back, {session['user']['name']}!", "success")\n''', '''        session["user"] = {"name": user_match.get("name", "User"), "email": user_match.get("email", email), "role": user_match.get("role", "Student")}\n        if db_enabled():\n            touch_login(email)\n            increment_metric("logins")\n        flash(f"Welcome back, {session['user']['name']}!", "success")\n''')
+          repl('''        save_user({"name": name, "email": email, "password": generate_password_hash(password), "role": role})\n        session.clear()\n''', '''        save_user({"name": name, "email": email, "password": generate_password_hash(password), "role": role})\n        if db_enabled():\n            increment_metric("registrations")\n        session.clear()\n''')
+          anchor = '''def allowed_dataset(filename):\n'''
+          tracking = '''@app.before_request\ndef track_request():\n    if not db_enabled() or request.path.startswith("/static/"):\n        return\n    try:\n        visitor = session.get("_visitor_id")\n        if not visitor:\n            visitor = secrets.token_hex(16)\n            session["_visitor_id"] = visitor\n        digest = hashlib.sha256((visitor + app.config["SECRET_KEY"]).encode()).hexdigest()\n        record_request(request.path, digest, "user" in session)\n    except Exception as exc:\n        print("Traffic tracking warning:", exc)\n\n\n'''
+          repl(anchor, tracking + anchor)
+          admin_routes = '''\n\n@app.route("/admin")\n@admin_required\ndef admin_console():\n    if not db_enabled():\n        flash("Admin analytics requires DATABASE_URL / Neon.", "warning")\n        return redirect(url_for("dashboard"))\n    return render_template("admin.html", users=fetch_users(), stats=admin_snapshot())\n\n\n@app.route("/admin/users/<int:user_id>/toggle", methods=["POST"])\n@admin_required\ndef admin_toggle_user(user_id):\n    users = fetch_users() if db_enabled() else []\n    target = next((u for u in users if int(u.get("id", 0)) == user_id), None)\n    if not target:\n        flash("User not found.", "danger")\n    elif target.get("email") == session.get("user", {}).get("email"):\n        flash("You cannot disable your own administrator account.", "warning")\n    else:\n        set_user_active(user_id, not bool(target.get("is_active")))\n        flash("User status updated.", "success")\n    return redirect(url_for("admin_console"))\n\n\n@app.route("/admin/users/<int:user_id>/role", methods=["POST"])\n@admin_required\ndef admin_change_role(user_id):\n    role = request.form.get("role", "Student")\n    users = fetch_users() if db_enabled() else []\n    target = next((u for u in users if int(u.get("id", 0)) == user_id), None)\n    if not target:\n        flash("User not found.", "danger")\n    elif target.get("email") == session.get("user", {}).get("email"):\n        flash("You cannot change your own administrator role here.", "warning")\n    elif role not in {"Admin", "Student"}:\n        flash("Invalid role.", "danger")\n    else:\n        set_user_role(user_id, role)\n        flash(f"{target.get('name','User')} is now {role}.", "success")\n    return redirect(url_for("admin_console"))\n'''
+          repl('\n\n@app.errorhandler(413)\n', admin_routes + '\n\n@app.errorhandler(413)\n')
+          Path('app.py').write_text(app, encoding='utf-8')
+
+          base = Path('templates/base.html').read_text(encoding='utf-8')
+          old = '''      <a href="{{ url_for('report') }}" class="{% if request.endpoint in ['report','download_saved_report'] %}active{% endif %}"><i class="fa-solid fa-file-pdf"></i><span>Reports</span></a>\n'''
+          new = old + '''      {% if session.get('user', {}).get('role') == 'Admin' %}<div class="nav-heading">Administration</div><a href="{{ url_for('admin_console') }}" class="{% if request.endpoint and request.endpoint.startswith('admin_') %}active{% endif %}"><i class="fa-solid fa-shield-halved"></i><span>Admin Console</span></a>{% endif %}\n'''
+          if old not in base: raise SystemExit('Base nav anchor missing')
+          Path('templates/base.html').write_text(base.replace(old,new,1), encoding='utf-8')
+
+          req = Path('requirements.txt').read_text(encoding='utf-8')
+          if 'psycopg[' not in req:
+              req = req.rstrip() + '\npsycopg[binary]==3.2.3\n'
+          Path('requirements.txt').write_text(req, encoding='utf-8')
+          PY
+      - name: Validate syntax
+        run: |
+          python -m py_compile app.py db_store.py
+          python - <<'PY'
+          from jinja2 import Environment, FileSystemLoader
+          env=Environment(loader=FileSystemLoader('templates'))
+          for name in ['base.html','admin.html','login.html','register.html']:
+              env.get_template(name)
+          print('templates OK')
+          PY
+      - name: Commit generated application changes
+        run: |
+          git config user.name "void-tech-shiv"
+          git config user.email "actions@users.noreply.github.com"
+          git add app.py db_store.py requirements.txt templates/base.html templates/admin.html static/css/admin.css
+          git commit -m "feat: add Neon persistence and admin console"
+          git push origin feat/neon-admin-console
