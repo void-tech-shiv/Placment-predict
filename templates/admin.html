@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Admin Console - Placement Predict{% endblock %}
+{% block page_header %}Admin Console{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="admin-hero glass-panel mb-4">
+  <div>
+    <div class="pp-eyebrow">SYSTEM CONTROL</div>
+    <h1>Admin Console</h1>
+    <p>Manage accounts, monitor daily usage, and review platform activity from one place.</p>
+  </div>
+  <div class="admin-live"><span></span> Neon connected</div>
+</div>
+
+<div class="admin-kpis mb-4">
+  <div class="admin-kpi glass-panel"><small>Total Users</small><strong>{{ stats.totals.total_users }}</strong><span>{{ stats.totals.active_users }} active</span></div>
+  <div class="admin-kpi glass-panel"><small>Today's Visitors</small><strong>{{ stats.today.unique_visitors }}</strong><span>{{ stats.today.requests }} requests</span></div>
+  <div class="admin-kpi glass-panel"><small>Total Predictions</small><strong>{{ stats.totals.total_predictions }}</strong><span>{{ stats.today.predictions }} today</span></div>
+  <div class="admin-kpi glass-panel"><small>Today's Auth</small><strong>{{ stats.today.logins }}</strong><span>{{ stats.today.registrations }} registrations</span></div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-8">
+    <div class="glass-panel admin-card">
+      <div class="admin-card-head"><div><small>LAST 14 DAYS</small><h3>Traffic & visitors</h3></div></div>
+      <canvas id="trafficChart" height="105"></canvas>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="glass-panel admin-card">
+      <div class="admin-card-head"><div><small>LAST 7 DAYS</small><h3>Top pages</h3></div></div>
+      <div class="admin-pages">
+        {% for page in stats.top_pages %}<div><span>{{ page.path }}</span><strong>{{ page.requests }}</strong></div>{% else %}<p class="text-muted">No traffic yet.</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="glass-panel admin-card">
+  <div class="admin-card-head"><div><small>ACCESS CONTROL</small><h3>User management</h3></div><span class="admin-pill">{{ users|length }} accounts</span></div>
+  <div class="table-responsive">
+    <table class="table admin-table align-middle">
+      <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Created</th><th>Last login</th><th class="text-end">Controls</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+      <tr>
+        <td><strong>{{ u.name }}</strong><small>{{ u.email }}</small></td>
+        <td><span class="admin-pill">{{ u.role }}</span></td>
+        <td><span class="status-dot {{ 'active' if u.is_active else 'off' }}">{{ 'Active' if u.is_active else 'Disabled' }}</span></td>
+        <td>{{ u.created_at.strftime('%d %b %Y') if u.created_at else '-' }}</td>
+        <td>{{ u.last_login_at.strftime('%d %b, %H:%M') if u.last_login_at else 'Never' }}</td>
+        <td class="text-end">
+          <div class="admin-actions">
+            <form method="POST" action="{{ url_for('admin_toggle_user', user_id=u.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-light" {% if u.email == session.get('user',{}).get('email') %}disabled{% endif %}>{{ 'Disable' if u.is_active else 'Enable' }}</button>
+            </form>
+            <form method="POST" action="{{ url_for('admin_change_role', user_id=u.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="role" value="{{ 'Student' if u.role == 'Admin' else 'Admin' }}">
+              <button class="btn btn-sm btn-primary" {% if u.email == session.get('user',{}).get('email') %}disabled{% endif %}>Make {{ 'Student' if u.role == 'Admin' else 'Admin' }}</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="text-center text-muted py-5">No users yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const rows={{ stats.daily|tojson }};
+  const el=document.getElementById('trafficChart');
+  if(!el) return;
+  new Chart(el,{type:'line',data:{labels:rows.map(r=>r.traffic_date),datasets:[{label:'Requests',data:rows.map(r=>r.requests),tension:.35,fill:true},{label:'Unique visitors',data:rows.map(r=>r.unique_visitors),tension:.35}]},options:{responsive:true,plugins:{legend:{labels:{color:'#aeb8d4'}}},scales:{x:{ticks:{color:'#8f9ab7'},grid:{color:'rgba(255,255,255,.05)'}},y:{beginAtZero:true,ticks:{color:'#8f9ab7'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+});
+</script>
+{% endblock %}
