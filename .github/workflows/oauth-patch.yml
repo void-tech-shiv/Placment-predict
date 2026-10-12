@@ -1,0 +1,31 @@
+name: Apply Google OAuth Patch
+
+on:
+  push:
+    branches: ["feat/google-oauth"]
+    paths:
+      - "scripts/apply_google_oauth.py"
+      - ".github/workflows/oauth-patch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/google-oauth
+          fetch-depth: 0
+      - name: Apply OAuth patch
+        run: python scripts/apply_google_oauth.py
+      - name: Validate Python syntax
+        run: python -m compileall app.py
+      - name: Commit generated app changes
+        run: |
+          git config user.name "void-tech-shiv"
+          git config user.email "actions@users.noreply.github.com"
+          git add app.py
+          git diff --cached --quiet || git commit -m "feat: add Google OAuth routes"
+          git push origin feat/google-oauth
