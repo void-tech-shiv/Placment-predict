@@ -26,6 +26,8 @@ from flask import (
     url_for,
 )
 from flask_wtf.csrf import CSRFProtect
+from authlib.integrations.flask_client import OAuth
+from authlib.integrations.base_client.errors import OAuthError
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler, RobustScaler, StandardScaler
@@ -65,6 +67,35 @@ app.config.update(
 )
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 csrf = CSRFProtect(app)
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").strip().rstrip("/")
+
+oauth = OAuth(app)
+google_oauth = None
+if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+    google_oauth = oauth.register(
+        name="google",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
+
+
+def google_callback_uri():
+    configured = os.environ.get("GOOGLE_REDIRECT_URI", "").strip()
+    if configured:
+        return configured
+    if PUBLIC_BASE_URL:
+        return f"{PUBLIC_BASE_URL}/auth/google/callback"
+    return url_for("google_callback", _external=True)
+
+
+@app.context_processor
+def inject_oauth_flags():
+    return {"google_oauth_enabled": google_oauth is not None}
 
 if not os.environ.get("SECRET_KEY"):
     print("WARNING: SECRET_KEY is not set. A temporary key is being used for this run.")
@@ -293,6 +324,72 @@ def load_predictor():
 
 predictor = load_predictor()
 report_generator = ReportGenerator()
+
+
+@app.route("/auth/google")
+def google_login():
+    if google_oauth is None:
+        flash("Google sign-in is not configured yet.", "warning")
+        return redirect(url_for("login"))
+    redirect_uri = google_callback_uri()
+    return google_oauth.authorize_redirect(redirect_uri, prompt="select_account")
+
+
+@app.route("/auth/google/callback")
+def google_callback():
+    if google_oauth is None:
+        flash("Google sign-in is not configured yet.", "warning")
+        return redirect(url_for("login"))
+    try:
+        token = google_oauth.authorize_access_token()
+        userinfo = token.get("userinfo")
+        if not userinfo:
+            userinfo = google_oauth.userinfo(token=token)
+    except OAuthError as exc:
+        print("Google OAuth error:", exc)
+        flash("Google sign-in could not be completed. Please try again.", "danger")
+        return redirect(url_for("login"))
+    except Exception as exc:
+        print("Google OAuth callback warning:", exc)
+        flash("Google sign-in failed unexpectedly. Please try again.", "danger")
+        return redirect(url_for("login"))
+
+    email = str(userinfo.get("email", "")).strip().lower()
+    name = str(userinfo.get("name", "")).strip() or (email.split("@", 1)[0] if email else "Google User")
+    if not email:
+        flash("Google did not provide an email address for this account.", "danger")
+        return redirect(url_for("login"))
+    if "email_verified" in userinfo and not userinfo.get("email_verified"):
+        flash("Please verify your Google email address before signing in.", "danger")
+        return redirect(url_for("login"))
+
+    users = load_users()
+    user_match = next((u for u in users if u.get("email", "").lower() == email), None)
+    if user_match and user_match.get("is_active") is False:
+        flash("This account has been disabled by an administrator.", "danger")
+        return redirect(url_for("login"))
+
+    if not user_match:
+        role = "Admin" if not users else "Student"
+        # Store an unusable random hash so OAuth-only accounts cannot log in with a guessed password.
+        password_hash = generate_password_hash(secrets.token_urlsafe(48))
+        save_user({"name": name, "email": email, "password": password_hash, "role": role})
+        if db_enabled():
+            increment_metric("registrations")
+        user_match = {"name": name, "email": email, "role": role, "is_active": True}
+
+    session.clear()
+    session.permanent = True
+    session["user"] = {
+        "name": user_match.get("name") or name,
+        "email": email,
+        "role": user_match.get("role", "Student"),
+    }
+    if db_enabled():
+        touch_login(email)
+        increment_metric("logins")
+    flash(f"Welcome, {session['user']['name']}! Signed in with Google.", "success")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/login", methods=["GET", "POST"])

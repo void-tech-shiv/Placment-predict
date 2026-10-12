@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, "fix/**", "redesign/**"]
+    branches: [main, master, "fix/**", "redesign/**", "feat/**"]
   pull_request:
 
 jobs:
@@ -54,7 +54,8 @@ jobs:
               'preprocessing', 'download_preprocessed', 'train',
               'prediction', 'predict', 'history', 'report',
               'download_saved_report', 'download_report', 'export_csv',
-              'export_excel', 'login', 'register', 'logout'
+              'export_excel', 'login', 'register', 'logout',
+              'google_login', 'google_callback'
           }
           endpoints = {rule.endpoint for rule in project.app.url_map.iter_rules()}
           missing = sorted(required_endpoints - endpoints)
@@ -64,6 +65,7 @@ jobs:
           assert client.get('/login').status_code == 200
           assert client.get('/register').status_code == 200
           assert client.get('/').status_code in (301, 302)
+          assert client.get('/auth/google').status_code in (301, 302)
           print('Flask route and auth-page smoke tests passed')
           PY
 
